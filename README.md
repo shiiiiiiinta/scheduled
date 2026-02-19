@@ -1,73 +1,125 @@
-# React + TypeScript + Vite
+# 競艇選手 出走予定管理アプリ
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+競艇選手の向こう数ヶ月の出走予定をまとめて確認できるWebアプリケーションです。
 
-Currently, two official plugins are available:
+## 🚤 主な機能
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. 選手番号で検索
+- 選手登録番号で検索して、選手の出走予定を確認できます
+- 検索結果から選手をタップして、詳細ページに遷移できます
 
-## React Compiler
+### 2. G1以上のレース一覧
+- 向こう3ヶ月のG1以上（SG、G1）のレースを一覧表示
+- レースをタップすると、出場選手一覧が表示されます
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 3. 選手個人ページ
+- 選手の出走予定をガントチャート形式で表示
+- レース名、場名、開催予定日程が視覚的にわかりやすく表示されます
+- グレード別に色分けされています
 
-## Expanding the ESLint configuration
+### 4. レース出場選手一覧
+- G1レースの出場予定選手を一覧表示
+- 選手をタップすると、その選手の出走予定ページに遷移します
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 5. SG出場資格選手ランキング
+- SG出場資格を持つ選手の順位とポイントを表示
+- 優勝回数や獲得ポイントも確認できます
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+## 🛠 技術スタック
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+- **フロントエンド**: React 19.0.0
+- **言語**: TypeScript
+- **ビルドツール**: Vite 7.3.1
+- **ルーティング**: React Router v7.1.3
+- **日付処理**: date-fns 4.1.0
+- **HTTPクライアント**: axios 1.7.9
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## 📦 セットアップ
+
+### 前提条件
+- Node.js 18以上
+- npm または yarn
+
+### インストール
+
+```bash
+# 依存パッケージのインストール
+npm install
+
+# 開発サーバーの起動
+npm run dev
+
+# ビルド
+npm run build
+
+# プレビュー
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## 📁 プロジェクト構造
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
 ```
+src/
+├── api/              # APIクライアント
+│   └── boatrace.ts   # boatrace APIクライアント（モック）
+├── components/       # 再利用可能なコンポーネント
+├── pages/           # ページコンポーネント
+│   ├── HomePage.tsx          # トップページ
+│   ├── RacerPage.tsx         # 選手個人ページ
+│   ├── G1RacesPage.tsx       # G1レース一覧
+│   ├── RaceEntryPage.tsx     # レース出場選手一覧
+│   └── SGRankingPage.tsx     # SG出場資格選手ランキング
+├── types/           # TypeScript型定義
+│   └── index.ts
+├── utils/           # ユーティリティ関数
+│   └── venues.ts    # 競艇場マスタデータ
+├── App.tsx          # ルートコンポーネント
+└── main.tsx         # エントリーポイント
+```
+
+## 🎨 UI設計
+
+### カラースキーム
+- **SG**: 赤 (#dc3545) - 最高峰のレース
+- **G1**: 黄色 (#ffc107) - トップクラスのレース
+- **G2**: 緑 (#28a745)
+- **G3**: 青 (#17a2b8)
+
+### レスポンシブデザイン
+- モバイル、タブレット、デスクトップに対応
+- 横スクロール対応のガントチャート
+
+## ⚠️ 注意事項
+
+**このアプリケーションは現在モックデータを使用しています。**
+
+実際の出走予定データを取得するには、以下の実装が必要です：
+
+1. boatrace.jp公式サイトからのスクレイピング
+2. または公式APIが利用可能になった場合の統合
+
+### 実装の参考
+- 出走表URL: `/owpc/pc/race/racelist?jcd={会場コード}&hd={日付}&rno={レース番号}`
+- 選手情報URL: `/owpc/pc/extra/player/index?toban={選手登録番号}`
+
+## 🚀 今後の拡張予定
+
+- [ ] 実際のboatrace.jpからのデータ取得
+- [ ] 選手名での検索機能
+- [ ] レース結果の表示
+- [ ] お気に入り選手の登録
+- [ ] 通知機能（出走予定のリマインダー）
+- [ ] データのキャッシング
+- [ ] オフライン対応
+
+## 📄 ライセンス
+
+MIT License
+
+## 🤝 貢献
+
+プルリクエストを歓迎します！大きな変更の場合は、まずissueを開いて変更内容を議論してください。
+
+## 📞 お問い合わせ
+
+質問や提案がある場合は、Issueを作成してください。
