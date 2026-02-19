@@ -33,12 +33,14 @@
 - **ルーティング**: React Router v7.1.3
 - **日付処理**: date-fns 4.1.0
 - **HTTPクライアント**: axios 1.7.9
+- **バックエンド**: Cloudflare Workers（プロキシAPI）
 
 ## 📦 セットアップ
 
 ### 前提条件
 - Node.js 18以上
 - npm または yarn
+- Cloudflareアカウント（実際のデータ取得を使用する場合）
 
 ### インストール
 
@@ -46,7 +48,11 @@
 # 依存パッケージのインストール
 npm install
 
-# 開発サーバーの起動
+# 環境変数の設定
+cp .env.example .env
+# .envファイルを編集してCloudflare WorkersのURLを設定
+
+# 開発サーバーの起動（モックデータ使用）
 npm run dev
 
 # ビルド
@@ -56,12 +62,32 @@ npm run build
 npm run preview
 ```
 
+### Cloudflare Workersのデプロイ
+
+実際のboatrace.jpからデータを取得する場合は、Cloudflare Workersをデプロイする必要があります。
+
+詳細は [CLOUDFLARE_DEPLOY.md](./CLOUDFLARE_DEPLOY.md) を参照してください。
+
+```bash
+# Wranglerのインストール
+npm install -g wrangler
+
+# Cloudflareにログイン
+wrangler login
+
+# Workerのデプロイ
+wrangler deploy
+
+# デプロイ後、.envファイルにWorkerのURLを設定
+VITE_API_BASE_URL=https://boatrace-api-worker.your-subdomain.workers.dev
+```
+
 ## 📁 プロジェクト構造
 
 ```
 src/
 ├── api/              # APIクライアント
-│   └── boatrace.ts   # boatrace APIクライアント（モック）
+│   └── boatrace.ts   # boatrace APIクライアント（モック/リアルAPI切り替え）
 ├── components/       # 再利用可能なコンポーネント
 ├── pages/           # ページコンポーネント
 │   ├── HomePage.tsx          # トップページ
@@ -75,6 +101,9 @@ src/
 │   └── venues.ts    # 競艇場マスタデータ
 ├── App.tsx          # ルートコンポーネント
 └── main.tsx         # エントリーポイント
+
+workers/             # Cloudflare Workers
+└── boatrace-api.js  # boatrace.jpプロキシAPI
 ```
 
 ## 🎨 UI設計
@@ -89,27 +118,47 @@ src/
 - モバイル、タブレット、デスクトップに対応
 - 横スクロール対応のガントチャート
 
-## ⚠️ 注意事項
+## ⚠️ データソースについて
 
-**このアプリケーションは現在モックデータを使用しています。**
+このアプリケーションは2つのモードで動作します：
 
-実際の出走予定データを取得するには、以下の実装が必要です：
+### モックデータモード（デフォルト）
+- `.env`ファイルで`VITE_API_BASE_URL`が設定されていない場合
+- または`VITE_USE_MOCK_DATA=true`の場合
+- ハードコードされたサンプルデータを表示
 
-1. boatrace.jp公式サイトからのスクレイピング
-2. または公式APIが利用可能になった場合の統合
+### リアルデータモード
+- Cloudflare Workersをデプロイ後、`.env`に`VITE_API_BASE_URL`を設定
+- boatrace.jp公式サイトから実際のデータを取得
+- CORS制限を回避してデータを提供
 
-### 実装の参考
-- 出走表URL: `/owpc/pc/race/racelist?jcd={会場コード}&hd={日付}&rno={レース番号}`
-- 選手情報URL: `/owpc/pc/extra/player/index?toban={選手登録番号}`
+実際のデータを取得するには：
+
+1. [CLOUDFLARE_DEPLOY.md](./CLOUDFLARE_DEPLOY.md) の手順に従ってWorkerをデプロイ
+2. `.env`ファイルを作成してWorkerのURLを設定
+3. アプリを再起動
+
+### データ取得の仕組み
+
+```
+フロントエンド → Cloudflare Workers → boatrace.jp
+                 (プロキシAPI)        (公式サイト)
+                 
+- HTMLをスクレイピング
+- JSONに変換
+- CORSヘッダーを追加
+```
 
 ## 🚀 今後の拡張予定
 
-- [ ] 実際のboatrace.jpからのデータ取得
+- [x] Cloudflare Workersによるデータ取得
+- [x] モック/リアルデータの切り替え機能
+- [ ] HTMLパーサーの精度向上
 - [ ] 選手名での検索機能
 - [ ] レース結果の表示
 - [ ] お気に入り選手の登録
 - [ ] 通知機能（出走予定のリマインダー）
-- [ ] データのキャッシング
+- [ ] Cloudflare KVによるキャッシング
 - [ ] オフライン対応
 
 ## 📄 ライセンス
