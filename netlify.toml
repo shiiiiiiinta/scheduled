@@ -1,0 +1,14 @@
+# ビルド設定
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# 環境変数（ダッシュボードで設定することを推奨）
+[build.environment]
+  NODE_VERSION = "18"
+
+# リダイレクト設定（SPA用）
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

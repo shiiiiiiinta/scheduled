@@ -1,5 +1,5 @@
 name = "boatrace-api-worker"
-main = "workers/boatrace-api.js"
+main = "boatrace-api.js"
 compatibility_date = "2024-01-01"
 
 # Worker の設定
@@ -8,8 +8,3 @@ workers_dev = true
 # 環境変数（必要に応じて設定）
 [env.production]
 vars = { ENVIRONMENT = "production" }
-
-# ルート設定
-[[routes]]
-pattern = "*/api/*"
-zone_name = ""
