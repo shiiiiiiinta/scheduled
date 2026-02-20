@@ -1,4 +1,4 @@
-name = "boatrace-api-worker"
+name = "scheduled"
 main = "boatrace-api.js"
 compatibility_date = "2024-01-01"
 
