@@ -1,9 +1,12 @@
+# Cloudflare Pages 専用設定
+# Workersは別途デプロイしてください
+
 # ビルド設定
 [build]
   command = "npm run build"
   publish = "dist"
 
-# 環境変数（ダッシュボードで設定することを推奨）
+# 環境変数
 [build.environment]
   NODE_VERSION = "18"
 
@@ -12,3 +15,6 @@
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Workersの設定は含めない
+# Workerは workers/ ディレクトリから別途デプロイ
