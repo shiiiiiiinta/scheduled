@@ -47,13 +47,17 @@ Deploy command: npx wrangler deploy  ← これを削除！
 Framework preset: Vite
 Build command: npm run build
 Build output directory: dist
-Deploy command: (空欄)  ← 何も入力しない
+Deploy command: echo "Deployment complete"  ← ダミーコマンド（必須の場合）
 ```
+
+**注意**: もし Deploy command が必須フィールドの場合、`echo "Deployment complete"` や `echo "No additional deployment needed"` など、**何もしないダミーコマンド**を入力してください。
 
 ### Step 4: 保存
 
 1. **Edit configuration** をクリック
-2. **Deploy command** フィールドを **完全に空** にする
+2. **Deploy command** フィールドを以下のいずれかに設定：
+   - **完全に空** にする（可能な場合）
+   - または `echo "Deployment complete"` と入力（必須の場合）
 3. **Save** をクリック
 
 ### Step 5: 再デプロイ
@@ -73,7 +77,7 @@ Cloudflare Pagesで設定すべき項目：
 | Build command | `npm run build` |
 | Build output directory | `dist` |
 | Root directory | (空欄) |
-| Deploy command | **（空欄）** |
+| Deploy command | **（空欄 or `echo "Deployment complete"`）** |
 | Node.js version | 18 または auto |
 
 ---
