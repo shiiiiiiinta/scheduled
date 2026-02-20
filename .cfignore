@@ -1,0 +1,21 @@
+# Cloudflare Pages用 .cfignore
+# このファイルに記載されたファイル/ディレクトリはデプロイから除外されます
+
+# Workerディレクトリを除外（別途デプロイ）
+workers/
+workers/**
+
+# デプロイスクリプトを除外
+deploy-worker.sh
+
+# 設定ファイルを除外
+wrangler.toml
+workers/wrangler.toml
+
+# ドキュメントファイル（必要に応じて）
+CLOUDFLARE_DEPLOY.md
+DEPLOY_ERROR_FIX.md
+
+# ログ
+*.log
+.wrangler/
