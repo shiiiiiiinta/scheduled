@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { SG_SCHEDULE_2026 } from '../types/sg';
 import { SG_QUALIFICATION_CRITERIA, evaluateQualification, getQualifiedWithMargin } from '../utils/sgQualification';
 import type { SGRaceType, QualificationResult } from '../types/sg';
+import { boatraceAPI } from '../api/boatrace';
 
-// モックデータ（実際にはAPIから取得）
+// モックデータ（フォールバック用）
 import { getMockRacerPerformances } from '../api/mockData';
 
 export default function SGDetailPage() {
@@ -21,12 +22,39 @@ export default function SGDetailPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 実際にはAPIから取得
-        const racerPerformances = getMockRacerPerformances();
+        // 主要選手のID（A1級上位70名を想定）
+        const racerIds = Array.from({ length: 70 }, (_, i) => `${5000 + i}`);
+        const topRacerIds = ['4444', '4320', '3960', '4166', '4024'];
+        const allIds = [...topRacerIds, ...racerIds];
+
+        // Worker APIから選手成績を取得（最大20名ずつ）
+        const batchSize = 20;
+        let racerPerformances = [];
+        
+        for (let i = 0; i < allIds.length; i += batchSize) {
+          const batch = allIds.slice(i, i + batchSize);
+          try {
+            const performances = await boatraceAPI.getRacerPerformances(batch);
+            racerPerformances.push(...performances);
+          } catch (error) {
+            console.error(`バッチ${i / batchSize + 1}の取得に失敗:`, error);
+          }
+        }
+
+        // データが取得できなかった場合はモックデータを使用
+        if (racerPerformances.length === 0) {
+          console.warn('本番データの取得に失敗したため、モックデータを使用します');
+          racerPerformances = getMockRacerPerformances();
+        }
+
         const results = evaluateQualification(racerPerformances, sgTypeUpper);
         setQualificationResults(results);
       } catch (error) {
         console.error('データ取得エラー:', error);
+        // エラー時はモックデータを使用
+        const racerPerformances = getMockRacerPerformances();
+        const results = evaluateQualification(racerPerformances, sgTypeUpper);
+        setQualificationResults(results);
       } finally {
         setLoading(false);
       }

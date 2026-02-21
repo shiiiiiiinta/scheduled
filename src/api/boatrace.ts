@@ -1,5 +1,6 @@
 import axios from 'axios';
 import type { Racer, Race, RacerSchedule, RaceEntry, SGQualifiedRacer } from '../types';
+import type { RacerPerformance } from '../types/sg';
 import { addDays } from 'date-fns';
 
 // 環境変数から設定を取得
@@ -123,10 +124,34 @@ class BoatraceAPI {
       const response = await this.apiClient.get('/api/search', {
         params: { q: query },
       });
-      return response.data.racers || [];
+      return response.data.results || [];
     } catch (error) {
       console.error('選手検索に失敗しました:', error);
       return this.getMockSearchRacers(query); // フォールバック
+    }
+  }
+
+  // 選手の詳細成績を取得（SG用）
+  async getRacerPerformance(racerId: string): Promise<RacerPerformance | null> {
+    try {
+      const response = await this.apiClient.get(`/api/racer-performance/${racerId}`);
+      return response.data;
+    } catch (error) {
+      console.error(`選手${racerId}の成績取得に失敗しました:`, error);
+      return null;
+    }
+  }
+
+  // 複数選手の成績を一括取得（SG用）
+  async getRacerPerformances(racerIds: string[]): Promise<RacerPerformance[]> {
+    try {
+      const response = await this.apiClient.get('/api/racer-performances', {
+        params: { ids: racerIds.join(',') },
+      });
+      return response.data.performances || [];
+    } catch (error) {
+      console.error('選手成績の一括取得に失敗しました:', error);
+      return [];
     }
   }
 
