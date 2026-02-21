@@ -451,26 +451,37 @@ async function handleRequest(request) {
 
     // G1以上のレース一覧取得
     if (path === '/api/races/g1') {
-      // boatrace.jpからレース情報を取得
-      const response = await fetch(
-        `https://www.boatrace.jp/owpc/pc/race/index?jyo=24`,
+      // モックデータを返す（スクレイピングは実装中）
+      const today = new Date();
+      const mockRaces = [
         {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const html = await response.text();
-      const races = HTMLParser.parseRaceList(html);
+          raceName: '第32回グランドチャンピオン決定戦',
+          venueName: '福岡',
+          grade: 'SG',
+          startDate: new Date(2026, 2, 1).toISOString(),
+          endDate: new Date(2026, 2, 6).toISOString(),
+        },
+        {
+          raceName: '第71回ボートレースクラシック',
+          venueName: '平和島',
+          grade: 'SG',
+          startDate: new Date(2026, 2, 20).toISOString(),
+          endDate: new Date(2026, 2, 25).toISOString(),
+        },
+        {
+          raceName: 'オールスター',
+          venueName: '住之江',
+          grade: 'SG',
+          startDate: new Date(2026, 4, 20).toISOString(),
+          endDate: new Date(2026, 4, 25).toISOString(),
+        },
+      ];
 
       return new Response(
         JSON.stringify({
-          races: races.filter(r => r.grade === 'SG' || r.grade === 'G1'),
+          races: mockRaces,
+          source: 'mock',
+          message: 'レース一覧のスクレイピングは実装中です。現在はモックデータを返しています。',
         }),
         {
           headers: {
