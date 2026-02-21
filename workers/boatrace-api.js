@@ -451,45 +451,160 @@ async function handleRequest(request) {
 
     // G1以上のレース一覧取得
     if (path === '/api/races/g1') {
-      // モックデータを返す（スクレイピングは実装中）
-      const today = new Date();
-      const mockRaces = [
-        {
-          raceName: '第32回グランドチャンピオン決定戦',
-          venueName: '福岡',
-          grade: 'SG',
-          startDate: new Date(2026, 2, 1).toISOString(),
-          endDate: new Date(2026, 2, 6).toISOString(),
-        },
-        {
-          raceName: '第71回ボートレースクラシック',
-          venueName: '平和島',
-          grade: 'SG',
-          startDate: new Date(2026, 2, 20).toISOString(),
-          endDate: new Date(2026, 2, 25).toISOString(),
-        },
-        {
-          raceName: 'オールスター',
-          venueName: '住之江',
-          grade: 'SG',
-          startDate: new Date(2026, 4, 20).toISOString(),
-          endDate: new Date(2026, 4, 25).toISOString(),
-        },
-      ];
-
-      return new Response(
-        JSON.stringify({
-          races: mockRaces,
-          source: 'mock',
-          message: 'レース一覧のスクレイピングは実装中です。現在はモックデータを返しています。',
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
+      try {
+        const races = [];
+        const now = new Date();
+        const threeMonthsLater = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate());
+        
+        // SG・PG1スケジュール取得
+        const sgResponse = await fetch(
+          'https://www.boatrace.jp/owpc/pc/race/gradesch?hcd=01',
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          }
+        );
+        
+        if (sgResponse.ok) {
+          const sgHtml = await sgResponse.text();
+          // 日付、場所、レース名を抽出
+          const dateRegex = /<td class="td_date">(\d{2})\/(\d{2})-(\d{2})\/(\d{2})<\/td>/g;
+          const venueRegex = /<img[^>]*alt="([^"]+)"[^>]*src="\/static_extra\/pc\/images\/text_place/g;
+          const nameRegex = /<td class="is-p10-10 is-alignL"><a[^>]*>([^<]+)<\/a>/g;
+          const gradeRegex = /<td class="is-p10-0\s+is-G1a"><\/td>/g;
+          
+          const dates = [...sgHtml.matchAll(dateRegex)];
+          const venues = [...sgHtml.matchAll(venueRegex)];
+          const names = [...sgHtml.matchAll(nameRegex)];
+          
+          for (let i = 0; i < Math.min(dates.length, venues.length, names.length); i++) {
+            const [_, startMonth, startDay, endMonth, endDay] = dates[i];
+            const venueName = venues[i][1];
+            const raceName = names[i][1];
+            
+            const year = now.getFullYear();
+            const startDate = new Date(year, parseInt(startMonth) - 1, parseInt(startDay));
+            const endDate = new Date(year, parseInt(endMonth) - 1, parseInt(endDay));
+            
+            // 向こう3ヶ月以内のみ
+            if (startDate >= now && startDate <= threeMonthsLater) {
+              races.push({
+                raceName,
+                venueName,
+                grade: 'SG',
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+              });
+            }
+          }
         }
-      );
+        
+        // G1スケジュール取得
+        const g1Response = await fetch(
+          'https://www.boatrace.jp/owpc/pc/race/gradesch?hcd=02',
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          }
+        );
+        
+        if (g1Response.ok) {
+          const g1Html = await g1Response.text();
+          const dateRegex = /<td class="td_date">(\d{2})\/(\d{2})-(\d{2})\/(\d{2})<\/td>/g;
+          const venueRegex = /<img[^>]*alt="([^"]+)"[^>]*src="\/static_extra\/pc\/images\/text_place/g;
+          const nameRegex = /<td class="is-p10-10 is-alignL"><a[^>]*>([^<]+)<\/a>/g;
+          const gradeRegex = /<td class="is-p10-0\s+is-G1b"><\/td>/g;
+          
+          const dates = [...g1Html.matchAll(dateRegex)];
+          const venues = [...g1Html.matchAll(venueRegex)];
+          const names = [...g1Html.matchAll(nameRegex)];
+          const grades = [...g1Html.matchAll(gradeRegex)];
+          
+          let g1Count = 0;
+          for (let i = 0; i < dates.length && g1Count < grades.length; i++) {
+            const [_, startMonth, startDay, endMonth, endDay] = dates[i];
+            const venueName = venues[i][1];
+            const raceName = names[i][1];
+            
+            const year = now.getFullYear();
+            const startDate = new Date(year, parseInt(startMonth) - 1, parseInt(startDay));
+            const endDate = new Date(year, parseInt(endMonth) - 1, parseInt(endDay));
+            
+            // G1かどうかチェック（is-G1bがある行）
+            const rowStartIndex = g1Html.indexOf(dates[i][0]);
+            const nextRowIndex = g1Html.indexOf('<tr>', rowStartIndex + 1);
+            const rowHtml = g1Html.substring(rowStartIndex, nextRowIndex > rowStartIndex ? nextRowIndex : rowStartIndex + 500);
+            
+            if (rowHtml.includes('is-G1b')) {
+              // 向こう3ヶ月以内のみ
+              if (startDate >= now && startDate <= threeMonthsLater) {
+                races.push({
+                  raceName,
+                  venueName,
+                  grade: 'G1',
+                  startDate: startDate.toISOString(),
+                  endDate: endDate.toISOString(),
+                });
+              }
+              g1Count++;
+            }
+          }
+        }
+        
+        // 開始日でソート
+        races.sort((a, b) => new Date(a.startDate) - new Date(b.startDate));
+
+        return new Response(
+          JSON.stringify({
+            races,
+            source: 'boatrace.jp',
+            message: `SG/G1レース一覧（向こう3ヶ月）: ${races.length}件`,
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=3600, s-maxage=3600', // 1時間キャッシュ
+            },
+          }
+        );
+      } catch (error) {
+        console.error('G1レース一覧取得エラー:', error);
+        // エラー時はモックデータを返す
+        const mockRaces = [
+          {
+            raceName: '第32回グランドチャンピオン決定戦',
+            venueName: '福岡',
+            grade: 'SG',
+            startDate: new Date(2026, 2, 1).toISOString(),
+            endDate: new Date(2026, 2, 6).toISOString(),
+          },
+          {
+            raceName: '第71回ボートレースクラシック',
+            venueName: '平和島',
+            grade: 'SG',
+            startDate: new Date(2026, 2, 20).toISOString(),
+            endDate: new Date(2026, 2, 25).toISOString(),
+          },
+        ];
+        
+        return new Response(
+          JSON.stringify({
+            races: mockRaces,
+            source: 'mock',
+            message: 'スクレイピングに失敗したためモックデータを返しています',
+            error: error.message,
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
     }
 
     // レース詳細取得
