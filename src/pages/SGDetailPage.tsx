@@ -13,6 +13,8 @@ export default function SGDetailPage() {
   const [qualificationResults, setQualificationResults] = useState<QualificationResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAll, setShowAll] = useState(false);
+  const [prizeRankingMap, setPrizeRankingMap] = useState<Map<string, { rank: number; prizeMoney: number }>>(new Map());
+  const [fanVoteMap, setFanVoteMap] = useState<Map<string, { rank: number; votes: number }>>(new Map());
 
   const sgTypeUpper = sgType?.toUpperCase() as SGRaceType;
   const race = SG_SCHEDULE_2026.find((r) => r.type === sgTypeUpper);
@@ -22,6 +24,29 @@ export default function SGDetailPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // 賞金ランキングとファン投票ランキングを取得
+        const [prizeRanking, fanVoteRanking] = await Promise.all([
+          boatraceAPI.getPrizeRanking(),
+          boatraceAPI.getFanVoteRanking(),
+        ]);
+
+        // Mapに変換
+        const prizeMap = new Map(
+          prizeRanking.map((r) => [
+            r.racerId,
+            { rank: r.rank, prizeMoney: r.prizeMoney },
+          ])
+        );
+        const voteMap = new Map(
+          fanVoteRanking.map((r) => [
+            r.racerId,
+            { rank: r.rank, votes: r.votes },
+          ])
+        );
+
+        setPrizeRankingMap(prizeMap);
+        setFanVoteMap(voteMap);
+
         // 主要選手のID（A1級上位70名を想定）
         const racerIds = Array.from({ length: 70 }, (_, i) => `${5000 + i}`);
         const topRacerIds = ['4444', '4320', '3960', '4166', '4024'];
@@ -35,6 +60,18 @@ export default function SGDetailPage() {
           const batch = allIds.slice(i, i + batchSize);
           try {
             const performances = await boatraceAPI.getRacerPerformances(batch);
+            // 公式データで賞金と投票を上書き
+            performances.forEach((p) => {
+              const prize = prizeMap.get(p.racerId);
+              const vote = voteMap.get(p.racerId);
+              if (prize) {
+                p.totalPrizeMoney = prize.prizeMoney;
+                p.prizeRanking = prize.rank;
+              }
+              if (vote) {
+                p.fanVotes = vote.votes;
+              }
+            });
             racerPerformances.push(...performances);
           } catch (error) {
             console.error(`バッチ${i / batchSize + 1}の取得に失敗:`, error);
@@ -205,6 +242,8 @@ export default function SGDetailPage() {
                       <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">選手名</th>
                       <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">級別</th>
                       <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">支部</th>
+                      <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">獲得賞金</th>
+                      <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">ファン投票</th>
                       <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">選出理由</th>
                       <th className="px-4 py-3 text-center text-sm font-bold text-gray-700">資格</th>
                     </tr>
@@ -245,6 +284,34 @@ export default function SGDetailPage() {
                             </span>
                           </td>
                           <td className="px-4 py-4 text-gray-700">{result.racer.branch}</td>
+                          <td className="px-4 py-4 text-right">
+                            {prizeRankingMap.has(result.racerId) ? (
+                              <div className="text-sm">
+                                <div className="font-bold text-green-700">
+                                  ¥{prizeRankingMap.get(result.racerId)?.prizeMoney.toLocaleString()}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  ({prizeRankingMap.get(result.racerId)?.rank}位)
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 text-right">
+                            {fanVoteMap.has(result.racerId) ? (
+                              <div className="text-sm">
+                                <div className="font-bold text-purple-700">
+                                  {fanVoteMap.get(result.racerId)?.votes.toLocaleString()}票
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  ({fanVoteMap.get(result.racerId)?.rank}位)
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </td>
                           <td className="px-4 py-4 text-right text-sm text-gray-600">
                             {result.qualificationReason}
                           </td>
@@ -299,6 +366,8 @@ export default function SGDetailPage() {
           </h4>
           <ul className="text-yellow-800 text-sm space-y-1">
             <li>• 上記は選出順位のシミュレーションです（実際の選出とは異なる場合があります）</li>
+            <li>• 獲得賞金は公式サイト（boatrace-grandprix.jp）から最新データを取得しています</li>
+            <li>• ファン投票は投票サイト（macour.jp）から最新データを取得しています</li>
             <li>• フライング等の事故により出場資格を喪失する場合があります</li>
             <li>• シード権保持者は選出順位に関わらず優先的に出場できます</li>
             <li>• 最新の公式情報は BOAT RACE オフィシャルサイトをご確認ください</li>

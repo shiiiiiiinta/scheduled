@@ -95,14 +95,9 @@ class HTMLParser {
       const totalWins = totalWinsMatch ? parseInt(totalWinsMatch[1]) : 0;
       performance.generalWins = Math.max(0, totalWins - performance.sgWins - performance.g1Wins - performance.g2Wins);
 
-      // 獲得賞金（推定）
-      performance.totalPrizeMoney = performance.sgWins * 3800 + 
-                                    performance.g1Wins * 1200 + 
-                                    performance.g2Wins * 600 + 
-                                    performance.generalWins * 100;
-
-      // 賞金ランキング（推定）
-      performance.prizeRanking = 0; // 実際のランキングは別途取得が必要
+      // 獲得賞金とランキングは別途APIから取得
+      performance.totalPrizeMoney = 0; // /api/prize-ranking から取得
+      performance.prizeRanking = 0; // /api/prize-ranking から取得
 
       // SG成績
       performance.sgAppearances = performance.sgWins * 5; // 推定
@@ -113,14 +108,8 @@ class HTMLParser {
       performance.g2PlusPoints = (performance.sgWins + performance.g1Wins + performance.g2Wins) * 10;
       performance.g2PlusFinalPoints = performance.g2PlusPoints * 10;
 
-      // ファン投票（推定: 人気選手ほど高い）
-      if (performance.rank === 'A1' && performance.sgWins > 5) {
-        performance.fanVotes = 20000 + performance.sgWins * 3000;
-      } else if (performance.rank === 'A1') {
-        performance.fanVotes = 5000 + performance.g1Wins * 1000;
-      } else {
-        performance.fanVotes = 0;
-      }
+      // ファン投票は別途APIから取得
+      performance.fanVotes = 0; // /api/fan-vote-ranking から取得
 
       // 期間別勝率（通常の勝率を使用）
       performance.periodWinRate = performance.winRate;
@@ -173,6 +162,104 @@ class HTMLParser {
       return races;
     } catch (error) {
       console.error('出走予定のパースエラー:', error);
+      return [];
+    }
+  }
+
+  /**
+   * 獲得賞金ランキングをパース（公式サイトから）
+   */
+  static parsePrizeRanking(html) {
+    try {
+      const rankings = [];
+      
+      // テーブル行を抽出（登録番号、氏名、支部、獲得賞金を含む行）
+      const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
+      let match;
+
+      while ((match = rowRegex.exec(html)) !== null) {
+        const rowHtml = match[1];
+        
+        // 登録番号を抽出
+        const numberMatch = rowHtml.match(/登録番号[：:]?\s*(\d{4})/);
+        if (!numberMatch) continue;
+        
+        const racerId = numberMatch[1];
+
+        // 氏名を抽出
+        const nameMatch = rowHtml.match(/氏名[：:]?\s*([^<\s]+)/);
+        const name = nameMatch ? nameMatch[1].trim() : null;
+
+        // 獲得賞金を抽出（¥記号や,を除去）
+        const prizeMatch = rowHtml.match(/([\d,]+)\s*円/);
+        const prizeMoney = prizeMatch ? parseInt(prizeMatch[1].replace(/,/g, '')) : 0;
+
+        // 順位を抽出
+        const rankMatch = rowHtml.match(/>\s*(\d+)\s*</);
+        const rank = rankMatch ? parseInt(rankMatch[1]) : 0;
+
+        if (racerId && name && prizeMoney > 0) {
+          rankings.push({
+            rank,
+            racerId,
+            name,
+            prizeMoney,
+          });
+        }
+      }
+
+      return rankings;
+    } catch (error) {
+      console.error('賞金ランキングのパースエラー:', error);
+      return [];
+    }
+  }
+
+  /**
+   * ファン投票ランキングをパース
+   */
+  static parseFanVoteRanking(html) {
+    try {
+      const rankings = [];
+      
+      // テーブル行を抽出
+      const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
+      let match;
+
+      while ((match = rowRegex.exec(html)) !== null) {
+        const rowHtml = match[1];
+        
+        // 登録番号を抽出（4桁の数字）
+        const numberMatch = rowHtml.match(/>(\d{4})</);
+        if (!numberMatch) continue;
+        
+        const racerId = numberMatch[1];
+
+        // 氏名を抽出
+        const nameMatch = rowHtml.match(/>([\u4E00-\u9FFF\u3040-\u309F\u30A0-\u30FF]+)\s*選手</);
+        const name = nameMatch ? nameMatch[1].trim() : null;
+
+        // 投票数を抽出（,を除去）
+        const voteMatch = rowHtml.match(/([\d,]+)\s*票/);
+        const votes = voteMatch ? parseInt(voteMatch[1].replace(/,/g, '')) : 0;
+
+        // 順位を抽出
+        const rankMatch = rowHtml.match(/>\s*(\d+)\s*位/);
+        const rank = rankMatch ? parseInt(rankMatch[1]) : 0;
+
+        if (racerId && name && votes > 0) {
+          rankings.push({
+            rank,
+            racerId,
+            name,
+            votes,
+          });
+        }
+      }
+
+      return rankings;
+    } catch (error) {
+      console.error('ファン投票ランキングのパースエラー:', error);
       return [];
     }
   }
@@ -409,6 +496,102 @@ async function handleRequest(request) {
           },
         }
       );
+    }
+
+    // 獲得賞金ランキング取得
+    if (path === '/api/prize-ranking') {
+      try {
+        // 公式サイトから獲得賞金ランキングを取得
+        const response = await fetch(
+          'https://www.boatrace-grandprix.jp/2026/rtg/sp/ranking.php',
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const html = await response.text();
+        const rankings = HTMLParser.parsePrizeRanking(html);
+
+        return new Response(
+          JSON.stringify({
+            rankings,
+            source: 'boatrace-grandprix.jp',
+            updatedAt: new Date().toISOString(),
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      } catch (error) {
+        console.error('賞金ランキング取得エラー:', error);
+        return new Response(
+          JSON.stringify({ error: '賞金ランキングの取得に失敗しました', rankings: [] }),
+          {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
+    }
+
+    // ファン投票ランキング取得
+    if (path === '/api/fan-vote-ranking') {
+      try {
+        // マクールからファン投票ランキングを取得
+        const response = await fetch(
+          'https://sp.macour.jp/allstars',
+          {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const html = await response.text();
+        const rankings = HTMLParser.parseFanVoteRanking(html);
+
+        return new Response(
+          JSON.stringify({
+            rankings,
+            source: 'sp.macour.jp',
+            updatedAt: new Date().toISOString(),
+          }),
+          {
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      } catch (error) {
+        console.error('ファン投票ランキング取得エラー:', error);
+        return new Response(
+          JSON.stringify({ error: 'ファン投票ランキングの取得に失敗しました', rankings: [] }),
+          {
+            status: 500,
+            headers: {
+              ...corsHeaders,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+      }
     }
 
     // 選手検索

@@ -155,6 +155,28 @@ class BoatraceAPI {
     }
   }
 
+  // 獲得賞金ランキングを取得
+  async getPrizeRanking(): Promise<Array<{ rank: number; racerId: string; name: string; prizeMoney: number }>> {
+    try {
+      const response = await this.apiClient.get('/api/prize-ranking');
+      return response.data.rankings || [];
+    } catch (error) {
+      console.error('賞金ランキングの取得に失敗しました:', error);
+      return [];
+    }
+  }
+
+  // ファン投票ランキングを取得
+  async getFanVoteRanking(): Promise<Array<{ rank: number; racerId: string; name: string; votes: number }>> {
+    try {
+      const response = await this.apiClient.get('/api/fan-vote-ranking');
+      return response.data.rankings || [];
+    } catch (error) {
+      console.error('ファン投票ランキングの取得に失敗しました:', error);
+      return [];
+    }
+  }
+
   // ===== ユーティリティ関数 =====
 
   private getVenueCodeByName(name: string): string {
