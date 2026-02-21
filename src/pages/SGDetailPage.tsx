@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { SG_SCHEDULE_2026 } from '../types/sg';
 import { SG_QUALIFICATION_CRITERIA, evaluateQualification, getQualifiedWithMargin } from '../utils/sgQualification';
 import type { SGRaceType, QualificationResult } from '../types/sg';
@@ -10,6 +10,7 @@ import { getMockRacerPerformances } from '../api/mockData';
 
 export default function SGDetailPage() {
   const { sgType } = useParams<{ sgType: string }>();
+  const navigate = useNavigate();
   const [qualificationResults, setQualificationResults] = useState<QualificationResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -149,13 +150,24 @@ export default function SGDetailPage() {
 
   if (!race || !criteria) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-700 mb-4">SGレースが見つかりません</h1>
-          <Link to="/sg" className="text-blue-600 hover:underline">
-            SG一覧へ戻る
-          </Link>
-        </div>
+      <div style={{ maxWidth: '900px', margin: '0 auto', padding: '40px', textAlign: 'center' }}>
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#666', marginBottom: '16px' }}>
+          SGレースが見つかりません
+        </h1>
+        <button
+          onClick={() => navigate('/sg')}
+          style={{
+            padding: '12px 24px',
+            fontSize: '16px',
+            backgroundColor: '#007bff',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+          }}
+        >
+          SG一覧へ戻る
+        </button>
       </div>
     );
   }
@@ -169,40 +181,54 @@ export default function SGDetailPage() {
   const borderlineCount = displayResults.length - qualifiedCount;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
       {/* ヘッダー */}
-      <header className="bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg">
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold mb-2">{race.fullName}</h1>
-              <p className="text-red-100">
-                {new Date(race.startDate).toLocaleDateString('ja-JP')} ～{' '}
-                {new Date(race.endDate).toLocaleDateString('ja-JP')} @ {race.venue}
-              </p>
-            </div>
-            <Link
-              to="/sg"
-              className="px-6 py-2 bg-white text-red-600 rounded-lg hover:bg-red-50 transition-colors font-semibold"
-            >
-              ← SG一覧
-            </Link>
-          </div>
+      <div style={{ backgroundColor: '#dc3545', color: 'white', padding: '24px 0', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0 20px' }}>
+          <button
+            onClick={() => navigate('/sg')}
+            style={{
+              marginBottom: '16px',
+              padding: '8px 16px',
+              backgroundColor: 'white',
+              color: '#dc3545',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontWeight: 'bold',
+            }}
+          >
+            ← SG一覧へ戻る
+          </button>
+
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>{race.fullName}</h1>
+          <p style={{ opacity: 0.9, fontSize: '16px' }}>
+            {new Date(race.startDate).toLocaleDateString('ja-JP')} ～{' '}
+            {new Date(race.endDate).toLocaleDateString('ja-JP')} @ {race.venue}
+          </p>
 
           {/* 優勝賞金 */}
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 inline-block">
-            <div className="text-red-100 text-sm mb-1">優勝賞金</div>
-            <div className="text-3xl font-bold">
+          <div
+            style={{
+              marginTop: '16px',
+              display: 'inline-block',
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              borderRadius: '8px',
+              padding: '16px',
+            }}
+          >
+            <div style={{ fontSize: '14px', opacity: 0.9, marginBottom: '4px' }}>優勝賞金</div>
+            <div style={{ fontSize: '32px', fontWeight: 'bold' }}>
               {race.prizeMoney.toLocaleString()}
-              <span className="text-xl ml-1">万円</span>
+              <span style={{ fontSize: '20px', marginLeft: '4px' }}>万円</span>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 20px' }}>
         {/* 出場資格基準 */}
-        <div className="bg-white rounded-xl shadow-md p-6 mb-8">
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '24px', marginBottom: '32px' }}>
           <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
             <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
               <path
@@ -336,12 +362,17 @@ export default function SGDetailPage() {
                             </div>
                           </td>
                           <td className="px-4 py-4">
-                            <Link
-                              to={`/racer/${result.racerId}`}
-                              className="text-blue-600 hover:underline font-semibold"
+                            <span
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/racer/${result.racerId}`);
+                              }}
+                              style={{ color: '#007bff', cursor: 'pointer', fontWeight: 'bold' }}
+                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                             >
                               {result.racer.name}
-                            </Link>
+                            </span>
                           </td>
                           <td className="px-4 py-4">
                             <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-bold">
