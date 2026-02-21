@@ -107,7 +107,7 @@ npm ci && npm run build
      ビルドコマンド: npm run build
      出力: dist/
   3. デプロイ完了！
-     URL: https://scheduled.pages.dev
+     URL: https://scheduled-bvr.pages.dev
 
 ⚙️ Workers API (別途デプロイ)
   ↓
@@ -250,7 +250,7 @@ Deployments → Retry deployment
 ```
 ✓ Built in XXXs
 ✓ Deployment complete!
-✓ Visit: https://scheduled.pages.dev
+✓ Visit: https://scheduled-bvr.pages.dev
 ```
 
 ### Workerのデプロイ成功

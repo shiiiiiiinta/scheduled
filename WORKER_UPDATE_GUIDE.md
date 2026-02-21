@@ -82,13 +82,13 @@ https://boatrace-api-worker.your-subdomain.workers.dev/api/fan-vote-ranking
 ### 2. フロントエンドで確認
 
 1. Cloudflare Pages が自動再デプロイされるのを待つ
-   - https://scheduled.pages.dev
+   - https://scheduled-bvr.pages.dev
 
 2. SG一覧ページにアクセス
-   - https://scheduled.pages.dev/sg
+   - https://scheduled-bvr.pages.dev/sg
 
 3. 任意のSGレースをクリック
-   - 例: https://scheduled.pages.dev/sg/classic
+   - 例: https://scheduled-bvr.pages.dev/sg/classic
 
 4. 表に「獲得賞金」と「ファン投票」の列が表示されることを確認
    - 獲得賞金: 緑色で金額と順位
@@ -124,4 +124,4 @@ https://boatrace-api-worker.your-subdomain.workers.dev/api/fan-vote-ranking
 
 - Worker コード: https://github.com/shiiiiiiinta/scheduled/blob/main/workers/boatrace-api.js
 - デプロイガイド: https://github.com/shiiiiiiinta/scheduled/blob/main/WEB_WORKER_DEPLOY.md
-- フロントエンド: https://scheduled.pages.dev
+- フロントエンド: https://scheduled-bvr.pages.dev

@@ -48,7 +48,7 @@
 
 ### A. 開発者コンソールで確認
 
-1. https://scheduled.pages.dev/ にアクセス
+1. https://scheduled-bvr.pages.dev/ にアクセス
 2. F12キーで開発者ツールを開く
 3. コンソールタブで以下を確認：
 
@@ -65,20 +65,20 @@
 ### B. 各機能の動作確認
 
 #### 1. G1レース一覧ページ
-- URL: https://scheduled.pages.dev/races/g1
+- URL: https://scheduled-bvr.pages.dev/races/g1
 - 確認事項：実際のG1/SGレースが表示されるか
 
 #### 2. 選手検索
-- URL: https://scheduled.pages.dev/
+- URL: https://scheduled-bvr.pages.dev/
 - 選手番号（例：4320, 4444）を入力して検索
 - 実際の選手情報が表示されるか確認
 
 #### 3. 選手ガントチャート
-- 選手詳細ページ（例：https://scheduled.pages.dev/racer/4320）にアクセス
+- 選手詳細ページ（例：https://scheduled-bvr.pages.dev/racer/4320）にアクセス
 - ガントチャートが表示されるか確認
 
 #### 4. SG詳細ページ
-- URL: https://scheduled.pages.dev/sg/classic
+- URL: https://scheduled-bvr.pages.dev/sg/classic
 - 確認事項：
   - 全選手データ（75名）が表示される
   - 賞金ランキング（緑色）が表示される

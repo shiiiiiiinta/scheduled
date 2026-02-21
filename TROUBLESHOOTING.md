@@ -4,14 +4,14 @@
 
 **最終更新**: 2026-02-21  
 **コミット**: cafad43  
-**デプロイ先**: https://scheduled.pages.dev
+**デプロイ先**: https://scheduled-bvr.pages.dev
 
 ---
 
 ## ✅ 実装済みの機能
 
 ### 1. 診断ページ
-- **URL**: https://scheduled.pages.dev/diagnostics
+- **URL**: https://scheduled-bvr.pages.dev/diagnostics
 - **機能**:
   - 環境変数の設定状況を確認
   - APIエンドポイントの疎通確認
@@ -59,7 +59,7 @@ Cloudflare Pagesで環境変数が設定されていない
 
 ### ステップ1: 診断ページで現在の状態を確認
 
-1. https://scheduled.pages.dev/diagnostics にアクセス
+1. https://scheduled-bvr.pages.dev/diagnostics にアクセス
 2. 「環境変数」セクションを確認：
    - `USE_MOCK_DATA: true` → **環境変数未設定**
    - `USE_MOCK_DATA: false` → 環境変数は設定済み（APIの問題の可能性）
@@ -118,7 +118,7 @@ https://your-worker-url.workers.dev/api/fan-vote-ranking
 再デプロイ完了後、以下を確認：
 
 #### A. 診断ページで確認
-1. https://scheduled.pages.dev/diagnostics にアクセス
+1. https://scheduled-bvr.pages.dev/diagnostics にアクセス
 2. ブラウザの強制再読み込み（Ctrl+Shift+R / Cmd+Shift+R）
 3. 環境変数セクションを確認：
    ```json
@@ -131,14 +131,14 @@ https://your-worker-url.workers.dev/api/fan-vote-ranking
 
 #### B. 各機能をテスト
 
-1. **G1レース一覧**: https://scheduled.pages.dev/races/g1
+1. **G1レース一覧**: https://scheduled-bvr.pages.dev/races/g1
    - 実際のレースデータが表示されるか
    
-2. **選手検索**: https://scheduled.pages.dev/
+2. **選手検索**: https://scheduled-bvr.pages.dev/
    - 選手番号（例：4320, 4444）を検索
    - ガントチャートが表示されるか
    
-3. **SG詳細ページ**: https://scheduled.pages.dev/sg/classic
+3. **SG詳細ページ**: https://scheduled-bvr.pages.dev/sg/classic
    - 全75名の選手データが表示されるか
    - 賞金ランキング（緑色）が表示されるか
    - ファン投票（紫色）が表示されるか
