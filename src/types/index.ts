@@ -12,6 +12,15 @@ export interface Racer {
   birthDate?: string;
   winRate?: number; // 勝率
   rank?: string; // 級別
+  // SG選出に必要な統計情報
+  generalWins?: number; // 一般戦優勝回数
+  g1Wins?: number; // G1優勝回数
+  g2Wins?: number; // G2優勝回数
+  sgWins?: number; // SG優勝回数
+  sgPoints?: number; // SG得点（グランドチャンピオン用）
+  g2PlusPoints?: number; // G2以上優勝戦得点（オーシャンカップ用）
+  totalWinRate?: number; // 全国勝率（ダービー用）
+  prizeAmount?: number; // 賞金額（チャレンジカップ・グランプリ用）
 }
 
 // レース情報
@@ -65,4 +74,31 @@ export interface GanttItem {
   startDate: Date;
   endDate: Date;
   grade: RaceGrade;
+}
+
+// SGレース種別
+export type SGRaceType = 
+  | 'CLASSIC' // ボートレースクラシック（総理大臣杯）
+  | 'ALL_STAR' // ボートレースオールスター（笹川賞）
+  | 'GRAND_CHAMPION' // グランドチャンピオン
+  | 'OCEAN_CUP' // オーシャンカップ
+  | 'MEMORIAL' // ボートレースメモリアル（MB記念）
+  | 'DERBY' // ボートレースダービー（全日本選手権）
+  | 'CHALLENGE_CUP' // チャレンジカップ
+  | 'GRAND_PRIX'; // グランプリ（賞金王決定戦）
+
+// SG出場資格条件
+export interface SGQualification {
+  sgType: SGRaceType;
+  raceName: string; // 正式名称
+  scheduledMonth: number; // 開催予定月
+  qualificationCriteria: string; // 選出基準の説明
+  qualifiedRacers: SGQualifiedRacer[]; // 出場資格を満たす選手一覧
+}
+
+// SG選出順位付き選手
+export interface SGRankedRacer extends Racer {
+  selectionRank: number; // 選出順位
+  qualificationReason: string; // 選出理由（例: "一般戦優勝5回", "賞金ランキング3位"）
+  isSeeded?: boolean; // シード選手かどうか
 }

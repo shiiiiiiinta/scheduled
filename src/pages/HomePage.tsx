@@ -35,6 +35,10 @@ export const HomePage: React.FC = () => {
     navigate('/sg-ranking');
   };
 
+  const handleSGListClick = () => {
+    navigate('/sg');
+  };
+
   return (
     <div style={{ maxWidth: '800px', margin: '0 auto', padding: '20px' }}>
       <h1 style={{ textAlign: 'center', marginBottom: '40px' }}>競艇選手 出走予定</h1>
@@ -144,9 +148,33 @@ export const HomePage: React.FC = () => {
         </button>
       </div>
 
+      {/* ③SG競走スケジュール */}
+      <div style={{ marginBottom: '40px', padding: '24px', border: '1px solid #ddd', borderRadius: '8px', background: 'linear-gradient(135deg, #fff5f5 0%, #ffe8e8 100%)' }}>
+        <h2 style={{ marginBottom: '16px', color: '#c41e3a' }}>③SG競走スケジュール</h2>
+        <p style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
+          2026年の全8大会のSG競走スケジュールと出場資格選手を確認できます
+        </p>
+        <button
+          onClick={handleSGListClick}
+          style={{
+            width: '100%',
+            padding: '16px',
+            fontSize: '16px',
+            backgroundColor: '#c41e3a',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+          }}
+        >
+          SG競走スケジュールを見る
+        </button>
+      </div>
+
       {/* SG出場資格選手 */}
       <div style={{ padding: '24px', border: '1px solid #ddd', borderRadius: '8px' }}>
-        <h2 style={{ marginBottom: '16px' }}>SG出場資格選手</h2>
+        <h2 style={{ marginBottom: '16px' }}>SG出場資格選手（旧版）</h2>
         <p style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
           SG出場資格を持つ選手の順位とポイントを確認できます
         </p>
