@@ -41,19 +41,34 @@ export const DiagnosticsPage: React.FC = () => {
             const startTime = Date.now();
             const response = await fetch(`${API_BASE_URL}${endpoint}`);
             const endTime = Date.now();
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') || 'unknown';
+            const text = await response.text();
+            
+            let data;
+            let isJSON = false;
+            try {
+              data = JSON.parse(text);
+              isJSON = true;
+            } catch {
+              data = text.substring(0, 500); // HTMLの場合は最初の500文字のみ
+            }
             
             results.endpoints[endpoint] = {
               status: response.status,
               ok: response.ok,
               responseTime: `${endTime - startTime}ms`,
-              dataKeys: Object.keys(data),
-              dataSize: JSON.stringify(data).length,
+              contentType,
+              isJSON,
+              dataKeys: isJSON ? Object.keys(data) : null,
+              dataSize: text.length,
+              preview: isJSON ? JSON.stringify(data).substring(0, 200) : text.substring(0, 200),
+              fullUrl: `${API_BASE_URL}${endpoint}`,
             };
           } catch (error: any) {
             results.endpoints[endpoint] = {
               status: 'ERROR',
               error: error.message,
+              fullUrl: `${API_BASE_URL}${endpoint}`,
             };
           }
         }
