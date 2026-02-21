@@ -12,7 +12,9 @@ export default function SGDetailPage() {
   const { sgType } = useParams<{ sgType: string }>();
   const [qualificationResults, setQualificationResults] = useState<QualificationResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [prizeRankingMap, setPrizeRankingMap] = useState<Map<string, { rank: number; prizeMoney: number }>>(new Map());
   const [fanVoteMap, setFanVoteMap] = useState<Map<string, { rank: number; votes: number }>>(new Map());
 
@@ -20,8 +22,9 @@ export default function SGDetailPage() {
   const race = SG_SCHEDULE_2026.find((r) => r.type === sgTypeUpper);
   const criteria = race ? SG_QUALIFICATION_CRITERIA[race.type] : null;
 
+  // 初回ロード：主要選手のみ
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInitialData = async () => {
       setLoading(true);
       try {
         // 賞金ランキングとファン投票ランキングを取得
@@ -47,38 +50,27 @@ export default function SGDetailPage() {
         setPrizeRankingMap(prizeMap);
         setFanVoteMap(voteMap);
 
-        // 主要選手のID（A1級上位70名を想定）
-        const racerIds = Array.from({ length: 70 }, (_, i) => `${5000 + i}`);
-        const topRacerIds = ['4444', '4320', '3960', '4166', '4024'];
-        const allIds = [...topRacerIds, ...racerIds];
+        // 🎯 初回は主要選手のみ（5名）
+        const topRacerIds = ['4320', '4444', '3960', '4166', '4024'];
 
-        // Worker APIから選手成績を取得（最大20名ずつ）
-        const batchSize = 20;
-        let racerPerformances = [];
+        // Worker APIから主要選手の成績を取得
+        const performances = await boatraceAPI.getRacerPerformances(topRacerIds);
         
-        for (let i = 0; i < allIds.length; i += batchSize) {
-          const batch = allIds.slice(i, i + batchSize);
-          try {
-            const performances = await boatraceAPI.getRacerPerformances(batch);
-            // 公式データで賞金と投票を上書き
-            performances.forEach((p) => {
-              const prize = prizeMap.get(p.racerId);
-              const vote = voteMap.get(p.racerId);
-              if (prize) {
-                p.totalPrizeMoney = prize.prizeMoney;
-                p.prizeRanking = prize.rank;
-              }
-              if (vote) {
-                p.fanVotes = vote.votes;
-              }
-            });
-            racerPerformances.push(...performances);
-          } catch (error) {
-            console.error(`バッチ${i / batchSize + 1}の取得に失敗:`, error);
+        // 公式データで賞金と投票を上書き
+        performances.forEach((p) => {
+          const prize = prizeMap.get(p.racerId);
+          const vote = voteMap.get(p.racerId);
+          if (prize) {
+            p.totalPrizeMoney = prize.prizeMoney;
+            p.prizeRanking = prize.rank;
           }
-        }
+          if (vote) {
+            p.fanVotes = vote.votes;
+          }
+        });
 
         // データが取得できなかった場合はモックデータを使用
+        let racerPerformances = performances;
         if (racerPerformances.length === 0) {
           console.warn('本番データの取得に失敗したため、モックデータを使用します');
           racerPerformances = getMockRacerPerformances();
@@ -86,21 +78,74 @@ export default function SGDetailPage() {
 
         const results = evaluateQualification(racerPerformances, sgTypeUpper);
         setQualificationResults(results);
+        setInitialLoadComplete(true);
       } catch (error) {
         console.error('データ取得エラー:', error);
         // エラー時はモックデータを使用
         const racerPerformances = getMockRacerPerformances();
         const results = evaluateQualification(racerPerformances, sgTypeUpper);
         setQualificationResults(results);
+        setInitialLoadComplete(true);
       } finally {
         setLoading(false);
       }
     };
 
     if (race) {
-      fetchData();
+      fetchInitialData();
     }
   }, [race, sgTypeUpper]);
+
+  // 全選手データを読み込む
+  const loadAllRacers = async () => {
+    setLoadingMore(true);
+    try {
+      // A1級上位70名を想定
+      const racerIds = Array.from({ length: 70 }, (_, i) => `${5000 + i}`);
+      const topRacerIds = ['4320', '4444', '3960', '4166', '4024'];
+      const allIds = [...topRacerIds, ...racerIds];
+
+      // Worker APIから選手成績を取得（最大20名ずつ）
+      const batchSize = 20;
+      let racerPerformances = [];
+      
+      for (let i = 0; i < allIds.length; i += batchSize) {
+        const batch = allIds.slice(i, i + batchSize);
+        try {
+          const performances = await boatraceAPI.getRacerPerformances(batch);
+          // 公式データで賞金と投票を上書き
+          performances.forEach((p) => {
+            const prize = prizeRankingMap.get(p.racerId);
+            const vote = fanVoteMap.get(p.racerId);
+            if (prize) {
+              p.totalPrizeMoney = prize.prizeMoney;
+              p.prizeRanking = prize.rank;
+            }
+            if (vote) {
+              p.fanVotes = vote.votes;
+            }
+          });
+          racerPerformances.push(...performances);
+        } catch (error) {
+          console.error(`バッチ${i / batchSize + 1}の取得に失敗:`, error);
+        }
+      }
+
+      // データが取得できなかった場合はモックデータを使用
+      if (racerPerformances.length === 0) {
+        console.warn('本番データの取得に失敗したため、モックデータを使用します');
+        racerPerformances = getMockRacerPerformances();
+      }
+
+      const results = evaluateQualification(racerPerformances, sgTypeUpper);
+      setQualificationResults(results);
+      setShowAll(true);
+    } catch (error) {
+      console.error('全選手データ取得エラー:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   if (!race || !criteria) {
     return (
@@ -230,10 +275,30 @@ export default function SGDetailPage() {
           {loading ? (
             <div className="p-12 text-center">
               <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-red-600"></div>
-              <p className="mt-4 text-gray-600">データを読み込み中...</p>
+              <p className="mt-4 text-gray-600">主要選手のデータを読み込み中...</p>
+              <p className="mt-2 text-sm text-gray-500">※高速表示のため、まず主要選手のみを表示します</p>
             </div>
           ) : (
             <>
+              {/* 初回表示メッセージ */}
+              {!showAll && initialLoadComplete && qualificationResults.length > 0 && (
+                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
+                  <div className="flex items-start">
+                    <svg className="w-5 h-5 text-blue-500 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <div>
+                      <p className="text-sm font-medium text-blue-800">
+                        🚀 高速表示モード：現在、主要選手（約5名）のみを表示しています
+                      </p>
+                      <p className="text-xs text-blue-600 mt-1">
+                        全選手（約70名）のデータを表示するには、下記の「全選手のデータを表示」ボタンをクリックしてください
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-100 border-b-2 border-gray-300">
@@ -338,7 +403,36 @@ export default function SGDetailPage() {
               </div>
 
               {/* 全表示ボタン */}
-              {!showAll && qualificationResults.length > displayResults.length && (
+              {!showAll && initialLoadComplete && (
+                <div className="p-6 text-center border-t border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+                  <p className="text-gray-700 mb-4">
+                    現在、主要選手のみを表示しています。全選手のデータを表示するには下記ボタンをクリックしてください。
+                  </p>
+                  <button
+                    onClick={loadAllRacers}
+                    disabled={loadingMore}
+                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        <span>読み込み中...</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        <span>全選手のデータを表示（約70名）</span>
+                      </>
+                    )}
+                  </button>
+                  <p className="text-xs text-gray-500 mt-2">
+                    ※データ取得に数秒かかる場合があります
+                  </p>
+                </div>
+              )}
+              {showAll && qualificationResults.length > displayResults.length && (
                 <div className="p-6 text-center border-t border-gray-200">
                   <button
                     onClick={() => setShowAll(true)}

@@ -443,6 +443,7 @@ async function handleRequest(request) {
           headers: {
             ...corsHeaders,
             'Content-Type': 'application/json',
+            'Cache-Control': 'public, max-age=3600, s-maxage=3600', // 1時間キャッシュ
           },
         }
       );
@@ -528,6 +529,7 @@ async function handleRequest(request) {
             headers: {
               ...corsHeaders,
               'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=3600, s-maxage=3600', // 1時間キャッシュ
             },
           }
         );
@@ -576,6 +578,7 @@ async function handleRequest(request) {
             headers: {
               ...corsHeaders,
               'Content-Type': 'application/json',
+              'Cache-Control': 'public, max-age=1800, s-maxage=1800', // 30分キャッシュ（投票は変動が激しいため）
             },
           }
         );
