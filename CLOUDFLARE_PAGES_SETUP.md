@@ -1,248 +1,144 @@
-# Cloudflare Pages セットアップガイド
+# Cloudflare Pages 環境変数設定ガイド
 
-## ⚠️ メンテナンス表示が続く場合の対処法
+## 🔴 重要：環境変数の設定が必要です
 
-### 問題の原因
-Cloudflare Pagesで環境変数が設定されていない、またはデプロイ設定に問題がある可能性があります。
+現在、アプリがモックデータを使用している場合は、Cloudflare Pagesに環境変数が設定されていない可能性があります。
 
-## 🔧 解決手順
+## 問題の診断
 
-### 1. Cloudflare Pagesダッシュボードにアクセス
-
-1. https://dash.cloudflare.com/ にログイン
-2. 左メニューから **Workers & Pages** を選択
-3. **scheduled** プロジェクトをクリック
-
-### 2. デプロイ状況を確認
-
-1. **Deployments** タブをクリック
-2. 最新のデプロイの状態を確認
-   - ✅ **Success**: デプロイ成功
-   - ⏳ **In Progress**: デプロイ中
-   - ❌ **Failed**: デプロイ失敗（ログを確認）
-
-### 3. デプロイが失敗している場合
-
-#### ログを確認
-```
-1. 失敗したデプロイをクリック
-2. "View build log" をクリック
-3. エラーメッセージを確認
-```
-
-#### よくあるエラー
-
-**Error 1: Build command failed**
-```bash
-解決策:
-Settings > Builds & deployments > Edit configuration
-Build command: npm run build
-Build output directory: dist
-```
-
-**Error 2: Deploy command error**
-```bash
-解決策:
-Deploy command: echo "Deployment complete"
-（空欄または不要なコマンドを削除）
-```
-
-### 4. 環境変数を設定
-
-1. **Settings** タブをクリック
-2. **Environment variables** セクションを探す
-3. **Edit variables** をクリック
-
-#### 必要な環境変数
-
-```bash
-# Worker APIのURL（必須）
-VITE_API_BASE_URL=https://boatrace-api-worker.your-subdomain.workers.dev
-
-# モックデータを使用する場合（オプション）
-# VITE_USE_MOCK_DATA=true
-```
-
-**重要**: 
-- Production と Preview の両方にチェックを入れる
-- `your-subdomain` を実際のWorker URLに置き換える
-
-### 5. 再デプロイ
-
-環境変数を設定したら：
-
-1. **Deployments** タブに戻る
-2. 最新のデプロイの右側にある **...** メニューをクリック
-3. **Retry deployment** をクリック
-
-### 6. キャッシュをクリア
-
-#### ブラウザキャッシュをクリア
-
-**Chrome / Edge:**
-1. `Ctrl + Shift + Delete` (Windows) / `Cmd + Shift + Delete` (Mac)
-2. "キャッシュされた画像とファイル" を選択
-3. "データを削除" をクリック
-
-**または:**
-- `Ctrl + Shift + R` (Windows) / `Cmd + Shift + R` (Mac) でハードリロード
-
-#### Cloudflare キャッシュをパージ
-
-1. Cloudflare Dashboard → **Caching** → **Configuration**
-2. **Purge Everything** をクリック
-3. 確認して実行
-
-## 🧪 デプロイ確認
-
-### 1. URLにアクセス
+ブラウザの開発者コンソールを開いて、以下のメッセージを確認してください：
 
 ```
-https://scheduled.pages.dev
+🔧 API設定: {
+  API_BASE_URL: "",  // ← 空の場合、環境変数が未設定
+  USE_MOCK_DATA: true,  // ← trueの場合、モックデータを使用中
+  ...
+}
 ```
 
-### 2. 正常に表示されるか確認
+## 設定手順
 
-- ✅ ホームページが表示される
-- ✅ 選手検索が動作する
-- ✅ SG一覧ページにアクセスできる
+### 1. Cloudflare Worker URLの確認
 
-### 3. コンソールエラーを確認
+1. Cloudflare Dashboard (https://dash.cloudflare.com/) にログイン
+2. **Workers & Pages** → **boatrace-api-worker** を選択
+3. Worker URLをコピー（例：`https://boatrace-api-worker.shiiiiiiinta.workers.dev`）
 
-1. ブラウザで `F12` を押す
-2. **Console** タブを開く
-3. エラーメッセージがないか確認
+### 2. Cloudflare Pagesに環境変数を設定
 
-#### よくあるエラー
+1. Cloudflare Dashboard → **Workers & Pages** → **scheduled** を選択
+2. **Settings** タブ → **Environment variables** をクリック
+3. **Production** セクションで以下を追加：
 
-**Error: "Failed to fetch"**
-```
-原因: VITE_API_BASE_URL が設定されていない
-解決: 環境変数を設定して再デプロイ
-```
+   | Variable name | Value |
+   |---|---|
+   | `VITE_API_BASE_URL` | `https://boatrace-api-worker.shiiiiiiinta.workers.dev` |
+   | `VITE_USE_MOCK_DATA` | `false` |
 
-**Error: "CORS error"**
-```
-原因: Worker APIが正しくデプロイされていない
-解決: Worker を更新してデプロイ
-```
+4. **Preview** セクションでも同じ設定を追加
 
-## 🚀 完全なデプロイフロー
+5. **Save** をクリック
 
-### ステップ1: Worker をデプロイ
+### 3. 再デプロイ
 
-```bash
-# 方法1: Cloudflare Dashboard
-1. Workers & Pages → Create → Worker
-2. 名前: boatrace-api-worker
-3. Quick Edit → コードを貼り付け
-4. Save and Deploy
+環境変数を保存後、自動的に再デプロイが始まります。
+完了を待って（通常1〜2分）、アプリにアクセスして確認してください。
 
-# 方法2: Wrangler CLI
-cd workers
-npx wrangler deploy
-```
+## 確認方法
 
-### ステップ2: Worker URLを取得
+### A. 開発者コンソールで確認
+
+1. https://scheduled.pages.dev/ にアクセス
+2. F12キーで開発者ツールを開く
+3. コンソールタブで以下を確認：
 
 ```
-デプロイ後に表示される URL:
-https://boatrace-api-worker.your-subdomain.workers.dev
+🔧 API設定: {
+  API_BASE_URL: "https://boatrace-api-worker.shiiiiiiinta.workers.dev",
+  USE_MOCK_DATA: false,
+  ...
+}
 ```
 
-### ステップ3: Pages に環境変数を設定
+`API_BASE_URL`が正しく設定され、`USE_MOCK_DATA`が`false`になっていればOKです。
 
-```bash
-Settings > Environment variables > Edit variables
+### B. 各機能の動作確認
 
-VITE_API_BASE_URL=https://boatrace-api-worker.your-subdomain.workers.dev
-```
+#### 1. G1レース一覧ページ
+- URL: https://scheduled.pages.dev/races/g1
+- 確認事項：実際のG1/SGレースが表示されるか
 
-### ステップ4: Pages を再デプロイ
+#### 2. 選手検索
+- URL: https://scheduled.pages.dev/
+- 選手番号（例：4320, 4444）を入力して検索
+- 実際の選手情報が表示されるか確認
 
-```bash
-Deployments > ... > Retry deployment
-```
+#### 3. 選手ガントチャート
+- 選手詳細ページ（例：https://scheduled.pages.dev/racer/4320）にアクセス
+- ガントチャートが表示されるか確認
 
-### ステップ5: 確認
+#### 4. SG詳細ページ
+- URL: https://scheduled.pages.dev/sg/classic
+- 確認事項：
+  - 全選手データ（75名）が表示される
+  - 賞金ランキング（緑色）が表示される
+  - ファン投票（紫色）が表示される
 
-```
-https://scheduled.pages.dev
-```
+## トラブルシューティング
 
-## 📝 チェックリスト
+### ❌ 環境変数を設定したがモックデータが表示される
 
-デプロイ前に確認：
+**原因：** ブラウザキャッシュが残っている
 
-- [ ] GitHubリポジトリにコードがプッシュされている
-- [ ] Worker がデプロイされている
-- [ ] Worker URLが正しい
-- [ ] Pagesの環境変数が設定されている
-- [ ] Pagesのビルド設定が正しい
-  - Build command: `npm run build`
-  - Build output directory: `dist`
-  - Deploy command: `echo "Deployment complete"`
-- [ ] Node.js version: 18 以上
+**解決策：**
+1. Ctrl+Shift+R（Windows/Linux）または Cmd+Shift+R（Mac）で強制再読み込み
+2. または、開発者ツール → Network タブ → "Disable cache" をチェックして再読み込み
 
-## 🔍 トラブルシューティング
+### ❌ CORS エラーが表示される
 
-### 問題: ページが真っ白
+**原因：** Worker URLが間違っている、またはWorkerが更新されていない
 
-**原因1: JavaScriptエラー**
-```
-確認: ブラウザのコンソールを開く
-解決: エラーメッセージに従って修正
-```
+**解決策：**
+1. Worker URLを再確認
+2. `WORKER_UPDATE_GUIDE.md`を参照してWorkerを最新版に更新
+3. Workerコードに以下のCORSヘッダーが含まれているか確認：
+   ```javascript
+   'Access-Control-Allow-Origin': '*'
+   ```
 
-**原因2: ルーティングエラー**
-```
-確認: _redirects ファイルが正しいか
-解決: 
-/* /index.html 200
-```
+### ❌ API エラー (404, 500) が表示される
 
-### 問題: API呼び出しが失敗
+**原因：** Workerのエンドポイントが実装されていない、またはWorkerコードが古い
 
-**確認方法:**
-```javascript
-// ブラウザコンソールで実行
-console.log(import.meta.env.VITE_API_BASE_URL);
-```
+**解決策：**
+1. Workerを最新版に更新（`WORKER_UPDATE_GUIDE.md`参照）
+2. 必要なエンドポイント：
+   - `/api/racer/{id}` - 選手情報とスケジュール
+   - `/api/racer-performances?ids=xxx,yyy` - 選手成績一括取得
+   - `/api/prize-ranking` - 賞金ランキング
+   - `/api/fan-vote-ranking` - ファン投票ランキング
+   - `/api/races/g1` - G1/SGレース一覧
 
-**期待される結果:**
-```
-https://boatrace-api-worker.your-subdomain.workers.dev
-```
+### ❌ データが古い
 
-**undefinedの場合:**
-```
-→ 環境変数が設定されていない
-→ Pages の Settings で設定して再デプロイ
-```
+**原因：** ブラウザまたはCloudflareのキャッシュ
 
-### 問題: モックデータが表示される
+**解決策：**
+- 賞金ランキング：1時間ごとに自動更新
+- ファン投票：30分ごとに自動更新
+- 選手成績：1時間ごとに自動更新
+- 強制更新：ブラウザの強制再読み込み（Ctrl+Shift+R）
 
-**確認:**
-```javascript
-// ブラウザコンソールで実行
-console.log(import.meta.env.VITE_USE_MOCK_DATA);
-```
+## 関連ドキュメント
 
-**'true'の場合:**
-```
-→ VITE_USE_MOCK_DATA=true が設定されている
-→ この環境変数を削除するか false に変更
-```
+- [Workerデプロイガイド](./WORKER_UPDATE_GUIDE.md) - Cloudflare Workerの更新方法
+- [データ取得最適化](./DATA_FETCH_ANALYSIS.md) - パフォーマンス改善の詳細
 
-## 📚 関連ドキュメント
+## サポート
 
-- [Cloudflare Pages 公式ドキュメント](https://developers.cloudflare.com/pages/)
-- [環境変数の設定](https://developers.cloudflare.com/pages/configuration/build-configuration/#environment-variables)
-- [デプロイのトラブルシューティング](https://developers.cloudflare.com/pages/configuration/build-troubleshooting/)
+問題が解決しない場合は、以下の情報を添えて報告してください：
 
-## 💡 ヒント
-
-- 環境変数を変更したら必ず再デプロイが必要
-- デプロイには通常1-3分かかる
-- キャッシュが原因の場合はハードリロード（Ctrl+Shift+R）を試す
-- 問題が解決しない場合は Cloudflare Pages のログを確認
+1. ブラウザの開発者コンソールのスクリーンショット（API設定の出力含む）
+2. アクセスしたURL
+3. エラーメッセージの詳細
+4. Cloudflare Pages環境変数の設定内容（値は伏せてOK）

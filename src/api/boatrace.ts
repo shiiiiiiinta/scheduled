@@ -7,6 +7,14 @@ import { addDays } from 'date-fns';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true' || !API_BASE_URL;
 
+// デバッグ情報を出力
+console.log('🔧 API設定:', {
+  API_BASE_URL,
+  USE_MOCK_DATA,
+  VITE_API_BASE_URL: import.meta.env.VITE_API_BASE_URL,
+  VITE_USE_MOCK_DATA: import.meta.env.VITE_USE_MOCK_DATA,
+});
+
 class BoatraceAPI {
   private apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -30,12 +38,16 @@ class BoatraceAPI {
 
   // 選手の出走予定を取得
   async getRacerSchedule(racerId: string): Promise<RacerSchedule | null> {
+    console.log('📅 選手スケジュール取得開始:', { racerId, USE_MOCK_DATA, API_BASE_URL });
+    
     if (USE_MOCK_DATA) {
+      console.log('⚠️ モックデータを使用中');
       return this.getMockRacerSchedule(racerId);
     }
 
     try {
       const response = await this.apiClient.get(`/api/racer/${racerId}`);
+      console.log('✅ 選手スケジュール取得成功:', response.data);
       const racer = response.data.racer;
       const scheduleData = response.data.schedule || [];
 
@@ -53,19 +65,24 @@ class BoatraceAPI {
 
       return { racer, upcomingRaces };
     } catch (error) {
-      console.error('出走予定の取得に失敗しました:', error);
+      console.error('❌ 出走予定の取得に失敗しました:', error);
+      console.log('⚠️ モックデータにフォールバック');
       return this.getMockRacerSchedule(racerId); // フォールバック
     }
   }
 
   // 向こう3ヶ月のG1以上のレースを取得
   async getUpcomingG1Races(): Promise<Race[]> {
+    console.log('🏁 G1レース取得開始:', { USE_MOCK_DATA, API_BASE_URL });
+    
     if (USE_MOCK_DATA) {
+      console.log('⚠️ モックデータを使用中');
       return this.getMockUpcomingG1Races();
     }
 
     try {
       const response = await this.apiClient.get('/api/races/g1');
+      console.log('✅ G1レース取得成功:', response.data);
       const racesData = response.data.races || [];
 
       return racesData.map((item: any, index: number) => ({
@@ -79,7 +96,8 @@ class BoatraceAPI {
         days: 6,
       }));
     } catch (error) {
-      console.error('レース一覧の取得に失敗しました:', error);
+      console.error('❌ レース一覧の取得に失敗しました:', error);
+      console.log('⚠️ モックデータにフォールバック');
       return this.getMockUpcomingG1Races(); // フォールバック
     }
   }
@@ -116,7 +134,10 @@ class BoatraceAPI {
 
   // 選手番号で検索
   async searchRacers(query: string): Promise<Racer[]> {
+    console.log('🔍 選手検索開始:', { query, USE_MOCK_DATA, API_BASE_URL });
+    
     if (USE_MOCK_DATA) {
+      console.log('⚠️ モックデータを使用中');
       return this.getMockSearchRacers(query);
     }
 
@@ -124,9 +145,11 @@ class BoatraceAPI {
       const response = await this.apiClient.get('/api/search', {
         params: { q: query },
       });
+      console.log('✅ 選手検索成功:', response.data);
       return response.data.results || [];
     } catch (error) {
-      console.error('選手検索に失敗しました:', error);
+      console.error('❌ 選手検索に失敗しました:', error);
+      console.log('⚠️ モックデータにフォールバック');
       return this.getMockSearchRacers(query); // フォールバック
     }
   }
