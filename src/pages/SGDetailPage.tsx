@@ -229,41 +229,56 @@ export default function SGDetailPage() {
       <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 20px' }}>
         {/* 出場資格基準 */}
         <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', padding: '24px', marginBottom: '32px' }}>
-          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"
-                clipRule="evenodd"
-              />
-            </svg>
-            出場資格基準
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#333', marginBottom: '24px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            📋 出場資格基準
           </h2>
 
-          <div className="mb-4">
-            <div className="text-gray-600 font-semibold mb-2">選考期間</div>
-            <div className="text-gray-800">{criteria.selectionPeriod}</div>
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '8px', fontSize: '14px' }}>選考期間</div>
+            <div style={{ color: '#333', fontSize: '16px' }}>{criteria.selectionPeriod}</div>
           </div>
 
-          <div className="mb-4">
-            <div className="text-gray-600 font-semibold mb-2">総出場枠</div>
-            <div className="text-2xl font-bold text-red-600">{criteria.totalSlots}名</div>
+          <div style={{ marginBottom: '24px' }}>
+            <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '8px', fontSize: '14px' }}>総出場枠</div>
+            <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#dc3545' }}>{criteria.totalSlots}名</div>
           </div>
 
           <div>
-            <div className="text-gray-600 font-semibold mb-3">選出基準</div>
-            <div className="space-y-2">
+            <div style={{ color: '#666', fontWeight: 'bold', marginBottom: '16px', fontSize: '14px' }}>選出基準</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {criteria.criteria.map((c, index) => (
                 <div
                   key={index}
-                  className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'start',
+                    gap: '16px',
+                    padding: '16px',
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: '8px',
+                    border: '1px solid #e0e0e0',
+                  }}
                 >
-                  <div className="flex-shrink-0 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center font-bold">
+                  <div
+                    style={{
+                      flexShrink: 0,
+                      width: '32px',
+                      height: '32px',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontWeight: 'bold',
+                      fontSize: '16px',
+                    }}
+                  >
                     {c.priority}
                   </div>
-                  <div className="flex-1">
-                    <div className="font-semibold text-gray-800">{c.description}</div>
-                    <div className="text-sm text-gray-600 mt-1">
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>{c.description}</div>
+                    <div style={{ fontSize: '14px', color: '#666' }}>
                       選出方法: {c.method}
                       {typeof c.slots === 'number' && ` / 枠数: ${c.slots}名`}
                     </div>
@@ -274,13 +289,13 @@ export default function SGDetailPage() {
           </div>
 
           {/* 過去のボーダーライン */}
-          <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <h3 className="font-bold text-blue-900 mb-2">過去のボーダーライン</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div style={{ marginTop: '24px', padding: '16px', backgroundColor: '#e3f2fd', borderRadius: '8px', border: '1px solid #90caf9' }}>
+            <h3 style={{ fontWeight: 'bold', color: '#1565c0', marginBottom: '12px', fontSize: '16px' }}>過去のボーダーライン</h3>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
               {criteria.borderlineHistory.map((history) => (
-                <div key={history.year} className="text-sm">
-                  <span className="font-semibold text-blue-800">{history.year}年:</span>
-                  <span className="text-blue-700 ml-1">{history.value}</span>
+                <div key={history.year} style={{ fontSize: '14px' }}>
+                  <span style={{ fontWeight: 'bold', color: '#1976d2' }}>{history.year}年:</span>
+                  <span style={{ color: '#1565c0', marginLeft: '4px' }}>{history.value}</span>
                 </div>
               ))}
             </div>
@@ -288,36 +303,45 @@ export default function SGDetailPage() {
         </div>
 
         {/* 選出順位一覧 */}
-        <div className="bg-white rounded-xl shadow-md overflow-hidden">
-          <div className="bg-gradient-to-r from-gray-800 to-gray-700 px-6 py-4">
-            <h2 className="text-2xl font-bold text-white flex items-center justify-between">
+        <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
+          <div style={{ backgroundColor: '#495057', padding: '20px 24px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span>選出順位一覧</span>
-              <span className="text-sm font-normal">
+              <span style={{ fontSize: '14px', fontWeight: 'normal' }}>
                 資格者: {qualifiedCount}名 / ボーダー付近: +{borderlineCount}名
               </span>
             </h2>
           </div>
 
           {loading ? (
-            <div className="p-12 text-center">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-red-600"></div>
-              <p className="mt-4 text-gray-600">主要選手のデータを読み込み中...</p>
-              <p className="mt-2 text-sm text-gray-500">※高速表示のため、まず主要選手のみを表示します</p>
+            <div style={{ padding: '48px', textAlign: 'center' }}>
+              <div
+                style={{
+                  display: 'inline-block',
+                  width: '48px',
+                  height: '48px',
+                  border: '4px solid #f3f3f3',
+                  borderTop: '4px solid #dc3545',
+                  borderRadius: '50%',
+                  animation: 'spin 1s linear infinite',
+                }}
+              ></div>
+              <p style={{ marginTop: '16px', color: '#666' }}>主要選手のデータを読み込み中...</p>
+              <p style={{ marginTop: '8px', fontSize: '14px', color: '#999' }}>※高速表示のため、まず主要選手のみを表示します</p>
+              <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
             </div>
           ) : (
             <>
               {/* 初回表示メッセージ */}
               {!showAll && initialLoadComplete && qualificationResults.length > 0 && (
-                <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-4">
-                  <div className="flex items-start">
-                    <svg className="w-5 h-5 text-blue-500 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                    </svg>
+                <div style={{ backgroundColor: '#e3f2fd', borderLeft: '4px solid #2196F3', padding: '16px', margin: '16px 24px' }}>
+                  <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
+                    <span style={{ fontSize: '20px' }}>ℹ️</span>
                     <div>
-                      <p className="text-sm font-medium text-blue-800">
+                      <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#1565c0', marginBottom: '4px' }}>
                         🚀 高速表示モード：現在、主要選手（約5名）のみを表示しています
                       </p>
-                      <p className="text-xs text-blue-600 mt-1">
+                      <p style={{ fontSize: '12px', color: '#1976d2' }}>
                         全選手（約70名）のデータを表示するには、下記の「全選手のデータを表示」ボタンをクリックしてください
                       </p>
                     </div>
@@ -325,43 +349,50 @@ export default function SGDetailPage() {
                 </div>
               )}
               
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-100 border-b-2 border-gray-300">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">順位</th>
-                      <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">選手名</th>
-                      <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">級別</th>
-                      <th className="px-4 py-3 text-left text-sm font-bold text-gray-700">支部</th>
-                      <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">獲得賞金</th>
-                      <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">ファン投票</th>
-                      <th className="px-4 py-3 text-right text-sm font-bold text-gray-700">選出理由</th>
-                      <th className="px-4 py-3 text-center text-sm font-bold text-gray-700">資格</th>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>順位</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>選手名</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>級別</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>支部</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>獲得賞金</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>ファン投票</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>選出理由</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>資格</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody>
                     {displayResults.map((result, index) => {
                       const isQualified = result.qualified;
                       const isBorderline = !isQualified && index < displayResults.length;
-                      const rowClass = isQualified
-                        ? index < 3
-                          ? 'bg-yellow-50'
-                          : 'bg-white hover:bg-gray-50'
-                        : 'bg-gray-100 hover:bg-gray-200';
+                      const rowBg = isQualified
+                        ? (index < 3 ? '#fffbf0' : 'white')
+                        : '#f8f9fa';
 
                       return (
-                        <tr key={result.racerId} className={rowClass}>
-                          <td className="px-4 py-4">
-                            <div className="flex items-center gap-2">
+                        <tr
+                          key={result.racerId}
+                          style={{
+                            backgroundColor: rowBg,
+                            borderBottom: '1px solid #e0e0e0',
+                            transition: 'background-color 0.2s',
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isQualified ? '#ffeaa7' : '#e9ecef')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = rowBg)}
+                        >
+                          <td style={{ padding: '16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {index < 3 && isQualified && (
-                                <span className="text-2xl">
+                                <span style={{ fontSize: '24px' }}>
                                   {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
                                 </span>
                               )}
-                              <span className="font-bold text-lg text-gray-800">{result.rank}</span>
+                              <span style={{ fontWeight: 'bold', fontSize: '18px', color: '#333' }}>{result.rank}</span>
                             </div>
                           </td>
-                          <td className="px-4 py-4">
+                          <td style={{ padding: '16px' }}>
                             <span
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -374,54 +405,89 @@ export default function SGDetailPage() {
                               {result.racer.name}
                             </span>
                           </td>
-                          <td className="px-4 py-4">
-                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-bold">
+                          <td style={{ padding: '16px' }}>
+                            <span
+                              style={{
+                                padding: '4px 12px',
+                                backgroundColor: '#007bff',
+                                color: 'white',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                              }}
+                            >
                               {result.racer.rank}
                             </span>
                           </td>
-                          <td className="px-4 py-4 text-gray-700">{result.racer.branch}</td>
-                          <td className="px-4 py-4 text-right">
+                          <td style={{ padding: '16px', color: '#495057' }}>{result.racer.branch}</td>
+                          <td style={{ padding: '16px', textAlign: 'right' }}>
                             {prizeRankingMap.has(result.racerId) ? (
-                              <div className="text-sm">
-                                <div className="font-bold text-green-700">
+                              <div style={{ fontSize: '14px' }}>
+                                <div style={{ fontWeight: 'bold', color: '#28a745' }}>
                                   ¥{prizeRankingMap.get(result.racerId)?.prizeMoney.toLocaleString()}
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div style={{ fontSize: '12px', color: '#6c757d' }}>
                                   ({prizeRankingMap.get(result.racerId)?.rank}位)
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-sm">-</span>
+                              <span style={{ color: '#adb5bd', fontSize: '14px' }}>-</span>
                             )}
                           </td>
-                          <td className="px-4 py-4 text-right">
+                          <td style={{ padding: '16px', textAlign: 'right' }}>
                             {fanVoteMap.has(result.racerId) ? (
-                              <div className="text-sm">
-                                <div className="font-bold text-purple-700">
+                              <div style={{ fontSize: '14px' }}>
+                                <div style={{ fontWeight: 'bold', color: '#6f42c1' }}>
                                   {fanVoteMap.get(result.racerId)?.votes.toLocaleString()}票
                                 </div>
-                                <div className="text-xs text-gray-500">
+                                <div style={{ fontSize: '12px', color: '#6c757d' }}>
                                   ({fanVoteMap.get(result.racerId)?.rank}位)
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-gray-400 text-sm">-</span>
+                              <span style={{ color: '#adb5bd', fontSize: '14px' }}>-</span>
                             )}
                           </td>
-                          <td className="px-4 py-4 text-right text-sm text-gray-600">
+                          <td style={{ padding: '16px', textAlign: 'right', fontSize: '14px', color: '#666' }}>
                             {result.qualificationReason}
                           </td>
-                          <td className="px-4 py-4 text-center">
+                          <td style={{ padding: '16px', textAlign: 'center' }}>
                             {isQualified ? (
-                              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-bold">
+                              <span
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#d4edda',
+                                  color: '#155724',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
                                 資格あり
                               </span>
                             ) : isBorderline ? (
-                              <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm font-bold">
+                              <span
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#fff3cd',
+                                  color: '#856404',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                }}
+                              >
                                 ボーダー付近
                               </span>
                             ) : (
-                              <span className="px-3 py-1 bg-gray-200 text-gray-600 rounded-full text-sm">
+                              <span
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#e2e3e5',
+                                  color: '#6c757d',
+                                  borderRadius: '12px',
+                                  fontSize: '12px',
+                                }}
+                              >
                                 圏外
                               </span>
                             )}
@@ -435,42 +501,53 @@ export default function SGDetailPage() {
 
               {/* 全表示ボタン */}
               {!showAll && initialLoadComplete && (
-                <div className="p-6 text-center border-t border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-                  <p className="text-gray-700 mb-4">
+                <div style={{ padding: '24px', textAlign: 'center', borderTop: '1px solid #e0e0e0', background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)' }}>
+                  <p style={{ color: '#495057', marginBottom: '16px', fontSize: '14px' }}>
                     現在、主要選手のみを表示しています。全選手のデータを表示するには下記ボタンをクリックしてください。
                   </p>
                   <button
                     onClick={loadAllRacers}
                     disabled={loadingMore}
-                    className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                    style={{
+                      padding: '12px 32px',
+                      fontSize: '16px',
+                      background: loadingMore ? '#6c757d' : 'linear-gradient(135deg, #2196F3 0%, #9C27B0 100%)',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: loadingMore ? 'not-allowed' : 'pointer',
+                      fontWeight: 'bold',
+                      boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      opacity: loadingMore ? 0.6 : 1,
+                    }}
                   >
                     {loadingMore ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
+                        <div
+                          style={{
+                            width: '20px',
+                            height: '20px',
+                            border: '2px solid white',
+                            borderTop: '2px solid transparent',
+                            borderRadius: '50%',
+                            animation: 'spin 1s linear infinite',
+                          }}
+                        ></div>
                         <span>読み込み中...</span>
                       </>
                     ) : (
                       <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
+                        <span>📊</span>
                         <span>全選手のデータを表示（約70名）</span>
                       </>
                     )}
                   </button>
-                  <p className="text-xs text-gray-500 mt-2">
+                  <p style={{ fontSize: '12px', color: '#6c757d', marginTop: '8px' }}>
                     ※データ取得に数秒かかる場合があります
                   </p>
-                </div>
-              )}
-              {showAll && qualificationResults.length > displayResults.length && (
-                <div className="p-6 text-center border-t border-gray-200">
-                  <button
-                    onClick={() => setShowAll(true)}
-                    className="px-8 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors font-semibold"
-                  >
-                    全選手を表示（残り{qualificationResults.length - displayResults.length}名）
-                  </button>
                 </div>
               )}
             </>
@@ -478,24 +555,17 @@ export default function SGDetailPage() {
         </div>
 
         {/* 注意事項 */}
-        <div className="mt-8 bg-yellow-50 rounded-lg p-6 border border-yellow-200">
-          <h4 className="text-yellow-900 font-bold mb-2 flex items-center gap-2">
-            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
-                clipRule="evenodd"
-              />
-            </svg>
-            注意事項
+        <div style={{ marginTop: '32px', backgroundColor: '#fff3cd', borderRadius: '8px', padding: '24px', border: '1px solid #ffc107' }}>
+          <h4 style={{ color: '#856404', fontWeight: 'bold', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '16px' }}>
+            ⚠️ 注意事項
           </h4>
-          <ul className="text-yellow-800 text-sm space-y-1">
-            <li>• 上記は選出順位のシミュレーションです（実際の選出とは異なる場合があります）</li>
-            <li>• 獲得賞金は公式サイト（boatrace-grandprix.jp）から最新データを取得しています</li>
-            <li>• ファン投票は投票サイト（macour.jp）から最新データを取得しています</li>
-            <li>• フライング等の事故により出場資格を喪失する場合があります</li>
-            <li>• シード権保持者は選出順位に関わらず優先的に出場できます</li>
-            <li>• 最新の公式情報は BOAT RACE オフィシャルサイトをご確認ください</li>
+          <ul style={{ color: '#856404', fontSize: '14px', lineHeight: '1.8', margin: 0, paddingLeft: '20px' }}>
+            <li>上記は選出順位のシミュレーションです（実際の選出とは異なる場合があります）</li>
+            <li>獲得賞金は公式サイト（boatrace-grandprix.jp）から最新データを取得しています</li>
+            <li>ファン投票は投票サイト（macour.jp）から最新データを取得しています</li>
+            <li>フライング等の事故により出場資格を喪失する場合があります</li>
+            <li>シード権保持者は選出順位に関わらず優先的に出場できます</li>
+            <li>最新の公式情報は BOAT RACE オフィシャルサイトをご確認ください</li>
           </ul>
         </div>
       </div>
