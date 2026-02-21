@@ -91,8 +91,8 @@ class BoatraceAPI {
         venueCode: this.getVenueCodeByName(item.venueName),
         raceName: item.raceName,
         grade: item.grade,
-        startDate: new Date().toISOString(),
-        endDate: addDays(new Date(), 6).toISOString(),
+        startDate: item.startDate || new Date().toISOString(),
+        endDate: item.endDate || addDays(new Date(), 6).toISOString(),
         days: 6,
       }));
     } catch (error) {
@@ -167,13 +167,15 @@ class BoatraceAPI {
 
   // 複数選手の成績を一括取得（SG用）
   async getRacerPerformances(racerIds: string[]): Promise<RacerPerformance[]> {
+    console.log(`📊 選手成績一括取得開始: ${racerIds.length}名`);
     try {
       const response = await this.apiClient.get('/api/racer-performances', {
         params: { ids: racerIds.join(',') },
       });
+      console.log(`✅ 選手成績一括取得成功: ${response.data.performances?.length || 0}名`);
       return response.data.performances || [];
     } catch (error) {
-      console.error('選手成績の一括取得に失敗しました:', error);
+      console.error('❌ 選手成績の一括取得に失敗しました:', error);
       return [];
     }
   }

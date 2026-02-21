@@ -48,21 +48,25 @@ export default function SGDetailPage() {
         setPrizeRankingMap(prizeMap);
         setFanVoteMap(voteMap);
 
-        // 🎯 全選手データを一括取得（A1級上位70名 + 主要選手）
-        const topRacerIds = ['4320', '4444', '3960', '4166', '4024'];
-        const racerIds = Array.from({ length: 70 }, (_, i) => `${5000 + i}`);
-        const allIds = [...topRacerIds, ...racerIds];
+        // 🎯 賞金ランキングとファン投票から実際のID取得
+        const prizeRankerIds = prizeRanking.slice(0, 50).map((r) => r.racerId);
+        const fanVoteIds = fanVoteRanking.slice(0, 30).map((r) => r.racerId);
+        
+        // 重複を除去して結合
+        const uniqueIds = Array.from(new Set([...prizeRankerIds, ...fanVoteIds]));
+        
+        console.log(`実際の選手ID取得: 賞金ランキング${prizeRankerIds.length}名、ファン投票${fanVoteIds.length}名、ユニーク${uniqueIds.length}名`);
 
         // Worker APIから選手成績を取得（最大20名ずつバッチ処理）
         const batchSize = 20;
         let racerPerformances = [];
         
-        console.log(`全選手データ取得開始: ${allIds.length}名を${Math.ceil(allIds.length / batchSize)}バッチで処理`);
+        console.log(`全選手データ取得開始: ${uniqueIds.length}名を${Math.ceil(uniqueIds.length / batchSize)}バッチで処理`);
         
-        for (let i = 0; i < allIds.length; i += batchSize) {
-          const batch = allIds.slice(i, i + batchSize);
+        for (let i = 0; i < uniqueIds.length; i += batchSize) {
+          const batch = uniqueIds.slice(i, i + batchSize);
           const batchNumber = Math.floor(i / batchSize) + 1;
-          const totalBatches = Math.ceil(allIds.length / batchSize);
+          const totalBatches = Math.ceil(uniqueIds.length / batchSize);
           
           console.log(`バッチ${batchNumber}/${totalBatches} 処理中...`);
           
