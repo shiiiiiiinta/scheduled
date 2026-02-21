@@ -6,6 +6,7 @@ import { RaceEntryPage } from './pages/RaceEntryPage';
 import { SGRankingPage } from './pages/SGRankingPage';
 import SGListPage from './pages/SGListPage';
 import SGDetailPage from './pages/SGDetailPage';
+import { DiagnosticsPage } from './pages/DiagnosticsPage';
 import './App.css';
 
 function App() {
@@ -36,6 +37,7 @@ function App() {
             <Route path="/sg-ranking" element={<SGRankingPage />} />
             <Route path="/sg" element={<SGListPage />} />
             <Route path="/sg/:sgType" element={<SGDetailPage />} />
+            <Route path="/diagnostics" element={<DiagnosticsPage />} />
           </Routes>
         </main>
 

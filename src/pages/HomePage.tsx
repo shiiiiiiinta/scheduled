@@ -173,7 +173,7 @@ export const HomePage: React.FC = () => {
       </div>
 
       {/* SG出場資格選手 */}
-      <div style={{ padding: '24px', border: '1px solid #ddd', borderRadius: '8px' }}>
+      <div style={{ marginBottom: '40px', padding: '24px', border: '1px solid #ddd', borderRadius: '8px' }}>
         <h2 style={{ marginBottom: '16px' }}>SG出場資格選手（旧版）</h2>
         <p style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
           SG出場資格を持つ選手の順位とポイントを確認できます
@@ -192,6 +192,30 @@ export const HomePage: React.FC = () => {
           }}
         >
           SG出場資格選手を見る
+        </button>
+      </div>
+
+      {/* 診断ページ */}
+      <div style={{ padding: '20px', border: '2px dashed #dc3545', borderRadius: '8px', backgroundColor: '#fff3cd' }}>
+        <h2 style={{ marginBottom: '12px', color: '#856404', fontSize: '18px' }}>🔧 システム診断</h2>
+        <p style={{ marginBottom: '16px', color: '#856404', fontSize: '14px' }}>
+          モックデータが表示される場合は、診断ページで環境変数の設定状況を確認してください
+        </p>
+        <button
+          onClick={() => navigate('/diagnostics')}
+          style={{
+            width: '100%',
+            padding: '12px',
+            fontSize: '16px',
+            backgroundColor: '#dc3545',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+          }}
+        >
+          システム診断を実行
         </button>
       </div>
     </div>
