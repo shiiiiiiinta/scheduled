@@ -13,9 +13,6 @@ export default function SGDetailPage() {
   const navigate = useNavigate();
   const [qualificationResults, setQualificationResults] = useState<QualificationResult[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [showAll, setShowAll] = useState(false);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [prizeRankingMap, setPrizeRankingMap] = useState<Map<string, { rank: number; prizeMoney: number }>>(new Map());
   const [fanVoteMap, setFanVoteMap] = useState<Map<string, { rank: number; votes: number }>>(new Map());
 
@@ -23,9 +20,9 @@ export default function SGDetailPage() {
   const race = SG_SCHEDULE_2026.find((r) => r.type === sgTypeUpper);
   const criteria = race ? SG_QUALIFICATION_CRITERIA[race.type] : null;
 
-  // 初回ロード：主要選手のみ
+  // 初回ロード：全選手データを一括取得
   useEffect(() => {
-    const fetchInitialData = async () => {
+    const fetchAllData = async () => {
       setLoading(true);
       try {
         // 賞金ランキングとファン投票ランキングを取得
@@ -51,102 +48,72 @@ export default function SGDetailPage() {
         setPrizeRankingMap(prizeMap);
         setFanVoteMap(voteMap);
 
-        // 🎯 初回は主要選手のみ（5名）
+        // 🎯 全選手データを一括取得（A1級上位70名 + 主要選手）
         const topRacerIds = ['4320', '4444', '3960', '4166', '4024'];
+        const racerIds = Array.from({ length: 70 }, (_, i) => `${5000 + i}`);
+        const allIds = [...topRacerIds, ...racerIds];
 
-        // Worker APIから主要選手の成績を取得
-        const performances = await boatraceAPI.getRacerPerformances(topRacerIds);
+        // Worker APIから選手成績を取得（最大20名ずつバッチ処理）
+        const batchSize = 20;
+        let racerPerformances = [];
         
-        // 公式データで賞金と投票を上書き
-        performances.forEach((p) => {
-          const prize = prizeMap.get(p.racerId);
-          const vote = voteMap.get(p.racerId);
-          if (prize) {
-            p.totalPrizeMoney = prize.prizeMoney;
-            p.prizeRanking = prize.rank;
+        console.log(`全選手データ取得開始: ${allIds.length}名を${Math.ceil(allIds.length / batchSize)}バッチで処理`);
+        
+        for (let i = 0; i < allIds.length; i += batchSize) {
+          const batch = allIds.slice(i, i + batchSize);
+          const batchNumber = Math.floor(i / batchSize) + 1;
+          const totalBatches = Math.ceil(allIds.length / batchSize);
+          
+          console.log(`バッチ${batchNumber}/${totalBatches} 処理中...`);
+          
+          try {
+            const performances = await boatraceAPI.getRacerPerformances(batch);
+            
+            // 公式データで賞金と投票を上書き
+            performances.forEach((p) => {
+              const prize = prizeMap.get(p.racerId);
+              const vote = voteMap.get(p.racerId);
+              if (prize) {
+                p.totalPrizeMoney = prize.prizeMoney;
+                p.prizeRanking = prize.rank;
+              }
+              if (vote) {
+                p.fanVotes = vote.votes;
+              }
+            });
+            
+            racerPerformances.push(...performances);
+            console.log(`バッチ${batchNumber}完了: ${performances.length}名取得（合計: ${racerPerformances.length}名）`);
+          } catch (error) {
+            console.error(`バッチ${batchNumber}の取得に失敗:`, error);
           }
-          if (vote) {
-            p.fanVotes = vote.votes;
-          }
-        });
+        }
 
         // データが取得できなかった場合はモックデータを使用
-        let racerPerformances = performances;
         if (racerPerformances.length === 0) {
           console.warn('本番データの取得に失敗したため、モックデータを使用します');
           racerPerformances = getMockRacerPerformances();
         }
 
+        console.log(`全選手データ取得完了: ${racerPerformances.length}名`);
+        
         const results = evaluateQualification(racerPerformances, sgTypeUpper);
         setQualificationResults(results);
-        setInitialLoadComplete(true);
       } catch (error) {
         console.error('データ取得エラー:', error);
         // エラー時はモックデータを使用
         const racerPerformances = getMockRacerPerformances();
         const results = evaluateQualification(racerPerformances, sgTypeUpper);
         setQualificationResults(results);
-        setInitialLoadComplete(true);
       } finally {
         setLoading(false);
       }
     };
 
     if (race) {
-      fetchInitialData();
+      fetchAllData();
     }
   }, [race, sgTypeUpper]);
-
-  // 全選手データを読み込む
-  const loadAllRacers = async () => {
-    setLoadingMore(true);
-    try {
-      // A1級上位70名を想定
-      const racerIds = Array.from({ length: 70 }, (_, i) => `${5000 + i}`);
-      const topRacerIds = ['4320', '4444', '3960', '4166', '4024'];
-      const allIds = [...topRacerIds, ...racerIds];
-
-      // Worker APIから選手成績を取得（最大20名ずつ）
-      const batchSize = 20;
-      let racerPerformances = [];
-      
-      for (let i = 0; i < allIds.length; i += batchSize) {
-        const batch = allIds.slice(i, i + batchSize);
-        try {
-          const performances = await boatraceAPI.getRacerPerformances(batch);
-          // 公式データで賞金と投票を上書き
-          performances.forEach((p) => {
-            const prize = prizeRankingMap.get(p.racerId);
-            const vote = fanVoteMap.get(p.racerId);
-            if (prize) {
-              p.totalPrizeMoney = prize.prizeMoney;
-              p.prizeRanking = prize.rank;
-            }
-            if (vote) {
-              p.fanVotes = vote.votes;
-            }
-          });
-          racerPerformances.push(...performances);
-        } catch (error) {
-          console.error(`バッチ${i / batchSize + 1}の取得に失敗:`, error);
-        }
-      }
-
-      // データが取得できなかった場合はモックデータを使用
-      if (racerPerformances.length === 0) {
-        console.warn('本番データの取得に失敗したため、モックデータを使用します');
-        racerPerformances = getMockRacerPerformances();
-      }
-
-      const results = evaluateQualification(racerPerformances, sgTypeUpper);
-      setQualificationResults(results);
-      setShowAll(true);
-    } catch (error) {
-      console.error('全選手データ取得エラー:', error);
-    } finally {
-      setLoadingMore(false);
-    }
-  };
 
   if (!race || !criteria) {
     return (
@@ -173,9 +140,7 @@ export default function SGDetailPage() {
   }
 
   // ボーダーライン+10位までを取得
-  const displayResults = showAll
-    ? qualificationResults
-    : getQualifiedWithMargin(qualificationResults, 10);
+  const displayResults = getQualifiedWithMargin(qualificationResults, 10);
 
   const qualifiedCount = qualificationResults.filter((r) => r.qualified).length;
   const borderlineCount = displayResults.length - qualifiedCount;
@@ -326,29 +291,12 @@ export default function SGDetailPage() {
                   animation: 'spin 1s linear infinite',
                 }}
               ></div>
-              <p style={{ marginTop: '16px', color: '#666' }}>主要選手のデータを読み込み中...</p>
-              <p style={{ marginTop: '8px', fontSize: '14px', color: '#999' }}>※高速表示のため、まず主要選手のみを表示します</p>
+              <p style={{ marginTop: '16px', color: '#666', fontSize: '16px', fontWeight: 'bold' }}>全選手データを読み込み中...</p>
+              <p style={{ marginTop: '8px', fontSize: '14px', color: '#999' }}>約75名の選手データを取得しています</p>
               <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
             </div>
           ) : (
             <>
-              {/* 初回表示メッセージ */}
-              {!showAll && initialLoadComplete && qualificationResults.length > 0 && (
-                <div style={{ backgroundColor: '#e3f2fd', borderLeft: '4px solid #2196F3', padding: '16px', margin: '16px 24px' }}>
-                  <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
-                    <span style={{ fontSize: '20px' }}>ℹ️</span>
-                    <div>
-                      <p style={{ fontSize: '14px', fontWeight: 'bold', color: '#1565c0', marginBottom: '4px' }}>
-                        🚀 高速表示モード：現在、主要選手（約5名）のみを表示しています
-                      </p>
-                      <p style={{ fontSize: '12px', color: '#1976d2' }}>
-                        全選手（約70名）のデータを表示するには、下記の「全選手のデータを表示」ボタンをクリックしてください
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
@@ -498,58 +446,6 @@ export default function SGDetailPage() {
                   </tbody>
                 </table>
               </div>
-
-              {/* 全表示ボタン */}
-              {!showAll && initialLoadComplete && (
-                <div style={{ padding: '24px', textAlign: 'center', borderTop: '1px solid #e0e0e0', background: 'linear-gradient(135deg, #e3f2fd 0%, #f3e5f5 100%)' }}>
-                  <p style={{ color: '#495057', marginBottom: '16px', fontSize: '14px' }}>
-                    現在、主要選手のみを表示しています。全選手のデータを表示するには下記ボタンをクリックしてください。
-                  </p>
-                  <button
-                    onClick={loadAllRacers}
-                    disabled={loadingMore}
-                    style={{
-                      padding: '12px 32px',
-                      fontSize: '16px',
-                      background: loadingMore ? '#6c757d' : 'linear-gradient(135deg, #2196F3 0%, #9C27B0 100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '8px',
-                      cursor: loadingMore ? 'not-allowed' : 'pointer',
-                      fontWeight: 'bold',
-                      boxShadow: '0 4px 8px rgba(0,0,0,0.2)',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      opacity: loadingMore ? 0.6 : 1,
-                    }}
-                  >
-                    {loadingMore ? (
-                      <>
-                        <div
-                          style={{
-                            width: '20px',
-                            height: '20px',
-                            border: '2px solid white',
-                            borderTop: '2px solid transparent',
-                            borderRadius: '50%',
-                            animation: 'spin 1s linear infinite',
-                          }}
-                        ></div>
-                        <span>読み込み中...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>📊</span>
-                        <span>全選手のデータを表示（約70名）</span>
-                      </>
-                    )}
-                  </button>
-                  <p style={{ fontSize: '12px', color: '#6c757d', marginTop: '8px' }}>
-                    ※データ取得に数秒かかる場合があります
-                  </p>
-                </div>
-              )}
             </>
           )}
         </div>
