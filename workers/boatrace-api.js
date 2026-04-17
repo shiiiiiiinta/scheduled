@@ -173,37 +173,42 @@ class HTMLParser {
     try {
       const rankings = [];
       
-      // テーブル行を抽出（登録番号、氏名、支部、獲得賞金を含む行）
-      const rowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
+      // data属性付きのtr要素を抽出（登録番号がdata属性に入っている）
+      const rowRegex = /<tr data="(\d+)"[^>]*>([\s\S]*?)<\/tr>/g;
       let match;
 
       while ((match = rowRegex.exec(html)) !== null) {
-        const rowHtml = match[1];
+        const racerId = match[1];
+        const rowHtml = match[2];
         
-        // 登録番号を抽出
-        const numberMatch = rowHtml.match(/登録番号[：:]?\s*(\d{4})/);
-        if (!numberMatch) continue;
-        
-        const racerId = numberMatch[1];
-
-        // 氏名を抽出
-        const nameMatch = rowHtml.match(/氏名[：:]?\s*([^<\s]+)/);
-        const name = nameMatch ? nameMatch[1].trim() : null;
-
-        // 獲得賞金を抽出（¥記号や,を除去）
-        const prizeMatch = rowHtml.match(/([\d,]+)\s*円/);
-        const prizeMoney = prizeMatch ? parseInt(prizeMatch[1].replace(/,/g, '')) : 0;
-
-        // 順位を抽出
-        const rankMatch = rowHtml.match(/>\s*(\d+)\s*</);
+        // 順位を抽出（<span class="rank rankX ...>数字</span>）
+        const rankMatch = rowHtml.match(/<span class="rank[^"]*">\s*(\d+)\s*<\/span>/);
         const rank = rankMatch ? parseInt(rankMatch[1]) : 0;
 
-        if (racerId && name && prizeMoney > 0) {
+        // 氏名を抽出（<span class="racer">名前</span>）
+        const nameMatch = rowHtml.match(/<span class="racer">([^<]+)<\/span>/);
+        const name = nameMatch ? nameMatch[1].trim() : null;
+
+        // 支部を抽出（<span class="shibu">支部名</span>）
+        const branchMatch = rowHtml.match(/<span class="shibu">([^<]+)<\/span>/);
+        const branch = branchMatch ? branchMatch[1].trim() : null;
+
+        // 級別を抽出（<span class="kyu">級別</span>）
+        const rankClassMatch = rowHtml.match(/<span class="kyu">([^<]+)<\/span>/);
+        const rankClass = rankClassMatch ? rankClassMatch[1].trim() : null;
+
+        // 獲得賞金を抽出（<span class="money">数字</span>円）
+        const prizeMatch = rowHtml.match(/<span class="money">([\d,]+)<\/span>円/);
+        const prizeMoney = prizeMatch ? prizeMatch[1] : '0';
+
+        if (racerId && name) {
           rankings.push({
             rank,
-            racerId,
+            registrationNumber: racerId,
             name,
-            prizeMoney,
+            branch,
+            rankClass,
+            prizeMoney: `¥${prizeMoney}`,
           });
         }
       }
