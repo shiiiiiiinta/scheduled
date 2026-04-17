@@ -468,20 +468,32 @@ async function handleRequest(request) {
         
         if (sgResponse.ok) {
           const sgHtml = await sgResponse.text();
-          // 日付、場所、レース名を抽出
-          const dateRegex = /<td class="td_date">(\d{2})\/(\d{2})-(\d{2})\/(\d{2})<\/td>/g;
-          const venueRegex = /<img[^>]*alt="([^"]+)"[^>]*src="\/static_extra\/pc\/images\/text_place/g;
-          const nameRegex = /<td class="is-p10-10 is-alignL"><a[^>]*>([^<]+)<\/a>/g;
-          const gradeRegex = /<td class="is-p10-0\s+is-G1a"><\/td>/g;
           
-          const dates = [...sgHtml.matchAll(dateRegex)];
-          const venues = [...sgHtml.matchAll(venueRegex)];
-          const names = [...sgHtml.matchAll(nameRegex)];
+          // テーブル行ごとに処理
+          const rowRegex = /<tr>([\s\S]*?)<\/tr>/g;
+          const rows = [...sgHtml.matchAll(rowRegex)];
           
-          for (let i = 0; i < Math.min(dates.length, venues.length, names.length); i++) {
-            const [_, startMonth, startDay, endMonth, endDay] = dates[i];
-            const venueName = venues[i][1];
-            const raceName = names[i][1];
+          for (const row of rows) {
+            const rowHtml = row[1];
+            
+            // 日付を抽出
+            const dateMatch = rowHtml.match(/<td class="td_date">(\d{2})\/(\d{2})-(\d{2})\/(\d{2})<\/td>/);
+            if (!dateMatch) continue;
+            
+            const [_, startMonth, startDay, endMonth, endDay] = dateMatch;
+            
+            // 場所を抽出
+            const venueMatch = rowHtml.match(/<img[^>]*alt="([^"]+)"[^>]*src="\/static_extra\/pc\/images\/text_place/);
+            if (!venueMatch) continue;
+            const venueName = venueMatch[1];
+            
+            // レース名を抽出
+            const nameMatch = rowHtml.match(/<td class="is-p10-10 is-alignL"><a[^>]*>([^<]+)<\/a>/);
+            if (!nameMatch) continue;
+            const raceName = nameMatch[1];
+            
+            // SGかチェック（is-G1aがある）
+            if (!rowHtml.includes('is-G1a')) continue;
             
             const year = now.getFullYear();
             const startDate = new Date(year, parseInt(startMonth) - 1, parseInt(startDay));
@@ -490,8 +502,8 @@ async function handleRequest(request) {
             // 向こう3ヶ月以内のみ
             if (startDate >= now && startDate <= threeMonthsLater) {
               races.push({
-                raceName,
-                venueName,
+                raceName: raceName.trim(),
+                venueName: venueName.trim(),
                 grade: 'SG',
                 startDate: startDate.toISOString(),
                 endDate: endDate.toISOString(),
@@ -512,43 +524,46 @@ async function handleRequest(request) {
         
         if (g1Response.ok) {
           const g1Html = await g1Response.text();
-          const dateRegex = /<td class="td_date">(\d{2})\/(\d{2})-(\d{2})\/(\d{2})<\/td>/g;
-          const venueRegex = /<img[^>]*alt="([^"]+)"[^>]*src="\/static_extra\/pc\/images\/text_place/g;
-          const nameRegex = /<td class="is-p10-10 is-alignL"><a[^>]*>([^<]+)<\/a>/g;
-          const gradeRegex = /<td class="is-p10-0\s+is-G1b"><\/td>/g;
           
-          const dates = [...g1Html.matchAll(dateRegex)];
-          const venues = [...g1Html.matchAll(venueRegex)];
-          const names = [...g1Html.matchAll(nameRegex)];
-          const grades = [...g1Html.matchAll(gradeRegex)];
+          // テーブル行ごとに処理
+          const rowRegex = /<tr>([\s\S]*?)<\/tr>/g;
+          const rows = [...g1Html.matchAll(rowRegex)];
           
-          let g1Count = 0;
-          for (let i = 0; i < dates.length && g1Count < grades.length; i++) {
-            const [_, startMonth, startDay, endMonth, endDay] = dates[i];
-            const venueName = venues[i][1];
-            const raceName = names[i][1];
+          for (const row of rows) {
+            const rowHtml = row[1];
+            
+            // 日付を抽出
+            const dateMatch = rowHtml.match(/<td class="td_date">(\d{2})\/(\d{2})-(\d{2})\/(\d{2})<\/td>/);
+            if (!dateMatch) continue;
+            
+            const [_, startMonth, startDay, endMonth, endDay] = dateMatch;
+            
+            // 場所を抽出
+            const venueMatch = rowHtml.match(/<img[^>]*alt="([^"]+)"[^>]*src="\/static_extra\/pc\/images\/text_place/);
+            if (!venueMatch) continue;
+            const venueName = venueMatch[1];
+            
+            // レース名を抽出
+            const nameMatch = rowHtml.match(/<td class="is-p10-10 is-alignL"><a[^>]*>([^<]+)<\/a>/);
+            if (!nameMatch) continue;
+            const raceName = nameMatch[1];
+            
+            // G1かチェック（is-G1bがある）
+            if (!rowHtml.includes('is-G1b')) continue;
             
             const year = now.getFullYear();
             const startDate = new Date(year, parseInt(startMonth) - 1, parseInt(startDay));
             const endDate = new Date(year, parseInt(endMonth) - 1, parseInt(endDay));
             
-            // G1かどうかチェック（is-G1bがある行）
-            const rowStartIndex = g1Html.indexOf(dates[i][0]);
-            const nextRowIndex = g1Html.indexOf('<tr>', rowStartIndex + 1);
-            const rowHtml = g1Html.substring(rowStartIndex, nextRowIndex > rowStartIndex ? nextRowIndex : rowStartIndex + 500);
-            
-            if (rowHtml.includes('is-G1b')) {
-              // 向こう3ヶ月以内のみ
-              if (startDate >= now && startDate <= threeMonthsLater) {
-                races.push({
-                  raceName,
-                  venueName,
-                  grade: 'G1',
-                  startDate: startDate.toISOString(),
-                  endDate: endDate.toISOString(),
-                });
-              }
-              g1Count++;
+            // 向こう3ヶ月以内のみ
+            if (startDate >= now && startDate <= threeMonthsLater) {
+              races.push({
+                raceName: raceName.trim(),
+                venueName: venueName.trim(),
+                grade: 'G1',
+                startDate: startDate.toISOString(),
+                endDate: endDate.toISOString(),
+              });
             }
           }
         }
@@ -561,6 +576,7 @@ async function handleRequest(request) {
             races,
             source: 'boatrace.jp',
             message: `SG/G1レース一覧（向こう3ヶ月）: ${races.length}件`,
+            updatedAt: new Date().toISOString(),
           }),
           {
             headers: {
