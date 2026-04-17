@@ -2,7 +2,8 @@
 
 /**
  * データ投入スクリプト
- * 賞金ランキングとファン投票から選手データを取得してD1に格納
+ * 賞金ランキングから選手データを取得してD1に格納
+ * （ファン投票データは現在取得不可のため賞金ランキングのみ）
  */
 
 const BASE_URL = 'https://scheduled.shinta7023.workers.dev';
@@ -17,10 +18,15 @@ async function fetchPrizeRanking() {
 
 async function fetchFanVoteRanking() {
   console.log('💜 ファン投票ランキングを取得中...');
-  const response = await fetch(`${BASE_URL}/api/fan-vote-ranking`);
-  const data = await response.json();
-  console.log(`✅ ファン投票: ${data.rankings.length}件取得`);
-  return data.rankings;
+  try {
+    const response = await fetch(`${BASE_URL}/api/fan-vote-ranking`);
+    const data = await response.json();
+    console.log(`✅ ファン投票: ${data.rankings.length}件取得`);
+    return data.rankings;
+  } catch (error) {
+    console.log(`⚠️  ファン投票: 取得失敗（スキップ）`);
+    return [];
+  }
 }
 
 async function fetchRacerInfo(racerId) {
@@ -58,15 +64,19 @@ async function main() {
 
   console.log(`\n📝 ユニークな選手: ${racerIds.size}名\n`);
 
+  // 最大30名まで処理（賞金ランキング上位）
+  const maxRacers = Math.min(30, racerIds.size);
+  console.log(`📊 処理対象: ${maxRacers}名\n`);
+
   // Step 3: 選手データを取得
   const racers = [];
   const performances = [];
   let count = 0;
 
-  for (const racerId of Array.from(racerIds).slice(0, 150)) { // 最初の150名
+  for (const racerId of Array.from(racerIds).slice(0, maxRacers)) {
     try {
       count++;
-      process.stdout.write(`\r選手データ取得中... ${count}/${Math.min(150, racerIds.size)}`);
+      process.stdout.write(`\r選手データ取得中... ${count}/${maxRacers}`);
 
       const [racer, performance] = await Promise.all([
         fetchRacerInfo(racerId),
@@ -109,7 +119,7 @@ async function main() {
       }
 
       // レート制限対策
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 50));
     } catch (error) {
       console.error(`\n❌ 選手${racerId}の取得に失敗:`, error.message);
     }
@@ -144,7 +154,8 @@ async function main() {
 
   // ファイルに書き込み
   const fs = require('fs');
-  const outputPath = './scripts/seed_data.sql';
+  const path = require('path');
+  const outputPath = path.join(__dirname, 'seed_data.sql');
   fs.writeFileSync(outputPath, sql);
 
   console.log(`📄 SQLファイル生成: ${outputPath}`);
@@ -159,8 +170,9 @@ async function main() {
     racerIds: racers.map(r => r.racer_id).sort((a, b) => a - b)
   };
 
-  fs.writeFileSync('./scripts/seed_summary.json', JSON.stringify(summary, null, 2));
-  console.log('📄 サマリーファイル生成: ./scripts/seed_summary.json\n');
+  const summaryPath = path.join(__dirname, 'seed_summary.json');
+  fs.writeFileSync(summaryPath, JSON.stringify(summary, null, 2));
+  console.log(`📄 サマリーファイル生成: ${summaryPath}\n`);
 
   console.log('🎉 データ投入スクリプト完了！\n');
   console.log('次のステップ:');
