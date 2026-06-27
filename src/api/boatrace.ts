@@ -65,6 +65,14 @@ class BoatraceAPI {
               ? addDays(new Date(item.startDate), 5).toISOString()
               : this.parseScheduleDate(item.date, 5));
 
+        // 開催日数を実際の期間から算出（最低1日）
+        const dayCount = Math.max(
+          1,
+          Math.round(
+            (new Date(endISO).getTime() - new Date(startISO).getTime()) / (1000 * 60 * 60 * 24)
+          ) + 1
+        );
+
         return {
           id: item.raceId || `race-${index}`,
           venueName: item.venueName,
@@ -73,7 +81,7 @@ class BoatraceAPI {
           grade: item.grade,
           startDate: startISO,
           endDate: endISO,
-          days: 6,
+          days: dayCount,
         };
       });
 
