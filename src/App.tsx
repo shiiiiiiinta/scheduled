@@ -9,6 +9,10 @@ import SGDetailPage from './pages/SGDetailPage';
 import { DiagnosticsPage } from './pages/DiagnosticsPage';
 import './App.css';
 
+// モックデータ使用中かどうか（本番はD1データを使用）
+const USE_MOCK_DATA =
+  import.meta.env.VITE_USE_MOCK_DATA === 'true' || !import.meta.env.VITE_API_BASE_URL;
+
 function App() {
   return (
     <Router>
@@ -55,9 +59,11 @@ function App() {
           <p style={{ margin: 0 }}>
             競艇選手 出走予定管理アプリ | データは boatrace.jp を参照
           </p>
-          <p style={{ margin: '8px 0 0 0', fontSize: '12px' }}>
-            ※このアプリはモックデータを使用しています。実際の出走予定データとは異なる場合があります。
-          </p>
+          {USE_MOCK_DATA && (
+            <p style={{ margin: '8px 0 0 0', fontSize: '12px' }}>
+              ※このアプリはモックデータを使用しています。実際の出走予定データとは異なる場合があります。
+            </p>
+          )}
         </footer>
       </div>
     </Router>
