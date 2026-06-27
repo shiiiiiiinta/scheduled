@@ -8,3 +8,11 @@ workers_dev = true
 # 環境変数（必要に応じて設定）
 [env.production]
 vars = { ENVIRONMENT = "production" }
+
+# D1 データベースのバインディング
+# ダッシュボードで Worker に D1 を接続する場合、この toml は参考情報です。
+# CLI でデプロイする場合は database_id を実際の値に置き換えてください。
+[[d1_databases]]
+binding = "DB"                 # コード内で env.DB として参照
+database_name = "boatrace-db"
+database_id = "YOUR_DATABASE_ID_HERE"

@@ -316,8 +316,65 @@ class HTMLParser {
   }
 }
 
+// ============================================
+// D1 ヘルパー関数
+// ============================================
+
+// DB が利用可能か判定
+function hasDB(env) {
+  return env && env.DB && typeof env.DB.prepare === 'function';
+}
+
+// racers + racer_performances を結合して1選手分を取得
+async function dbGetRacer(env, racerId) {
+  const row = await env.DB.prepare(
+    `SELECT r.racer_id, r.name, r.branch, r.rank, r.win_rate, r.avg_start_timing,
+            p.sg_wins, p.g1_wins, p.g2_wins, p.general_wins,
+            p.total_prize_money, p.prize_ranking,
+            p.fan_vote_count, p.fan_vote_ranking
+       FROM racers r
+       LEFT JOIN racer_performances p ON r.racer_id = p.racer_id
+      WHERE r.racer_id = ?`
+  ).bind(parseInt(racerId, 10)).first();
+  return row || null;
+}
+
+// DB行をフロント向けの選手オブジェクトに整形
+function mapRacerRow(row) {
+  if (!row) return null;
+  return {
+    id: String(row.racer_id),
+    racerId: String(row.racer_id),
+    name: (row.name || '').replace(/\s+/g, ' ').trim(),
+    branch: row.branch || null,
+    rank: row.rank || null,
+    winRate: row.win_rate ?? 0,
+    avgStartTiming: row.avg_start_timing ?? 0.15,
+    sgWins: row.sg_wins ?? 0,
+    g1Wins: row.g1_wins ?? 0,
+    g2Wins: row.g2_wins ?? 0,
+    generalWins: row.general_wins ?? 0,
+    totalPrizeMoney: row.total_prize_money ?? 0,
+    prizeRanking: row.prize_ranking ?? null,
+    fanVotes: row.fan_vote_count ?? 0,
+    fanVoteRanking: row.fan_vote_ranking ?? null,
+  };
+}
+
+// JSON レスポンスのショートカット
+function jsonResponse(data, extraHeaders = {}, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'application/json',
+      ...extraHeaders,
+    },
+  });
+}
+
 // メインハンドラー
-async function handleRequest(request) {
+async function handleRequest(request, env) {
   const url = new URL(request.url);
   const path = url.pathname;
 
@@ -332,8 +389,19 @@ async function handleRequest(request) {
     // 選手情報取得
     if (path.startsWith('/api/racer/')) {
       const racerId = path.split('/').pop();
-      
-      // boatrace.jpから選手情報を取得
+
+      // まず DB から取得を試みる
+      if (hasDB(env)) {
+        const row = await dbGetRacer(env, racerId);
+        if (row) {
+          return jsonResponse(
+            { racer: mapRacerRow(row), schedule: [], source: 'd1' },
+            { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' }
+          );
+        }
+      }
+
+      // DB に無ければ boatrace.jp からフォールバック取得
       const response = await fetch(
         `https://www.boatrace.jp/owpc/pc/data/racersearch/season?toban=${racerId}`,
         {
@@ -351,25 +419,25 @@ async function handleRequest(request) {
       const racerInfo = HTMLParser.parseRacerInfo(html);
       const schedule = HTMLParser.parseSchedule(html);
 
-      return new Response(
-        JSON.stringify({
-          racer: racerInfo,
-          schedule: schedule,
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      return jsonResponse({ racer: racerInfo, schedule, source: 'scrape' });
     }
 
     // 選手成績詳細取得（SG用）
     if (path.startsWith('/api/racer-performance/')) {
       const racerId = path.split('/').pop();
-      
-      // boatrace.jpから選手成績を取得
+
+      // DB から取得
+      if (hasDB(env)) {
+        const row = await dbGetRacer(env, racerId);
+        if (row) {
+          return jsonResponse(
+            mapRacerRow(row),
+            { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' }
+          );
+        }
+      }
+
+      // フォールバック: スクレイピング
       const response = await fetch(
         `https://www.boatrace.jp/owpc/pc/data/racersearch/season?toban=${racerId}`,
         {
@@ -386,37 +454,42 @@ async function handleRequest(request) {
       const html = await response.text();
       const performance = HTMLParser.parseRacerPerformance(html);
 
-      return new Response(
-        JSON.stringify(performance),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      return jsonResponse(performance);
     }
 
     // 複数選手の成績を一括取得
     if (path === '/api/racer-performances') {
-      const racerIds = url.searchParams.get('ids')?.split(',') || [];
-      
+      const racerIds = url.searchParams.get('ids')?.split(',').filter(Boolean) || [];
+
       if (racerIds.length === 0) {
-        return new Response(
-          JSON.stringify({ error: '選手IDが指定されていません' }),
-          {
-            status: 400,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        return jsonResponse({ error: '選手IDが指定されていません' }, {}, 400);
       }
 
-      // 並列で複数選手の成績を取得
+      // DB から一括取得（高速）
+      if (hasDB(env)) {
+        const ids = racerIds.map((id) => parseInt(id, 10)).filter((n) => !Number.isNaN(n));
+        if (ids.length > 0) {
+          const placeholders = ids.map(() => '?').join(',');
+          const { results } = await env.DB.prepare(
+            `SELECT r.racer_id, r.name, r.branch, r.rank, r.win_rate, r.avg_start_timing,
+                    p.sg_wins, p.g1_wins, p.g2_wins, p.general_wins,
+                    p.total_prize_money, p.prize_ranking,
+                    p.fan_vote_count, p.fan_vote_ranking
+               FROM racers r
+               LEFT JOIN racer_performances p ON r.racer_id = p.racer_id
+              WHERE r.racer_id IN (${placeholders})`
+          ).bind(...ids).all();
+
+          return jsonResponse(
+            { performances: (results || []).map(mapRacerRow), source: 'd1' },
+            { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' }
+          );
+        }
+      }
+
+      // フォールバック: 並列スクレイピング（最大20名）
       const performances = await Promise.all(
-        racerIds.slice(0, 20).map(async (racerId) => { // 最大20名まで
+        racerIds.slice(0, 20).map(async (racerId) => {
           try {
             const response = await fetch(
               `https://www.boatrace.jp/owpc/pc/data/racersearch/season?toban=${racerId}`,
@@ -426,11 +499,7 @@ async function handleRequest(request) {
                 },
               }
             );
-
-            if (!response.ok) {
-              return null;
-            }
-
+            if (!response.ok) return null;
             const html = await response.text();
             return HTMLParser.parseRacerPerformance(html);
           } catch (error) {
@@ -440,17 +509,9 @@ async function handleRequest(request) {
         })
       );
 
-      return new Response(
-        JSON.stringify({
-          performances: performances.filter(p => p !== null),
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-            'Cache-Control': 'public, max-age=3600, s-maxage=3600', // 1時間キャッシュ
-          },
-        }
+      return jsonResponse(
+        { performances: performances.filter((p) => p !== null), source: 'scrape' },
+        { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' }
       );
     }
 
@@ -648,6 +709,37 @@ async function handleRequest(request) {
 
     // 獲得賞金ランキング取得
     if (path === '/api/prize-ranking') {
+      // DB から取得（高速・安定）
+      if (hasDB(env)) {
+        try {
+          const { results } = await env.DB.prepare(
+            `SELECT r.racer_id, r.name, r.branch, r.rank,
+                    p.total_prize_money, p.prize_ranking
+               FROM racer_performances p
+               JOIN racers r ON r.racer_id = p.racer_id
+              WHERE p.prize_ranking IS NOT NULL
+              ORDER BY p.prize_ranking ASC`
+          ).all();
+
+          const rankings = (results || []).map((row) => ({
+            rank: row.prize_ranking,
+            racerId: String(row.racer_id),
+            name: (row.name || '').replace(/\s+/g, ' ').trim(),
+            branch: row.branch || null,
+            class: row.rank || null,
+            prizeMoney: row.total_prize_money ?? 0,
+          }));
+
+          return jsonResponse(
+            { rankings, source: 'd1', updatedAt: new Date().toISOString() },
+            { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' }
+          );
+        } catch (e) {
+          console.error('DB賞金ランキング取得エラー:', e);
+          // 失敗時はスクレイピングにフォールバック
+        }
+      }
+
       try {
         // 公式サイトから獲得賞金ランキングを取得
         const response = await fetch(
@@ -744,24 +836,63 @@ async function handleRequest(request) {
       }
     }
 
-    // 選手検索
+    // 選手検索（登録番号 or 氏名）
     if (path === '/api/search') {
-      const query = url.searchParams.get('q');
-      
+      const query = (url.searchParams.get('q') || '').trim();
+
       if (!query) {
-        return new Response(
-          JSON.stringify({ error: '検索クエリが指定されていません' }),
-          {
-            status: 400,
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        return jsonResponse({ error: '検索クエリが指定されていません' }, {}, 400);
       }
 
-      // 選手番号で検索
+      // DB から検索（登録番号 or 名前部分一致）
+      if (hasDB(env)) {
+        try {
+          const isNumeric = /^\d+$/.test(query);
+          // 名前検索用: スペースを除去した状態でも一致するようにパターン化
+          const namePattern = '%' + query.split('').join('%') + '%';
+
+          let stmt;
+          if (isNumeric) {
+            stmt = env.DB.prepare(
+              `SELECT r.racer_id, r.name, r.branch, r.rank, r.win_rate, r.avg_start_timing,
+                      p.sg_wins, p.g1_wins, p.g2_wins, p.general_wins,
+                      p.total_prize_money, p.prize_ranking,
+                      p.fan_vote_count, p.fan_vote_ranking
+                 FROM racers r
+                 LEFT JOIN racer_performances p ON r.racer_id = p.racer_id
+                WHERE r.racer_id = ? OR REPLACE(r.name, ' ', '') LIKE ?
+                LIMIT 30`
+            ).bind(parseInt(query, 10), namePattern);
+          } else {
+            stmt = env.DB.prepare(
+              `SELECT r.racer_id, r.name, r.branch, r.rank, r.win_rate, r.avg_start_timing,
+                      p.sg_wins, p.g1_wins, p.g2_wins, p.general_wins,
+                      p.total_prize_money, p.prize_ranking,
+                      p.fan_vote_count, p.fan_vote_ranking
+                 FROM racers r
+                 LEFT JOIN racer_performances p ON r.racer_id = p.racer_id
+                WHERE REPLACE(r.name, ' ', '') LIKE ? OR r.name LIKE ?
+                LIMIT 30`
+            ).bind(namePattern, '%' + query + '%');
+          }
+
+          const { results } = await stmt.all();
+          if (results && results.length > 0) {
+            return jsonResponse(
+              { results: results.map(mapRacerRow), source: 'd1' },
+              { 'Cache-Control': 'public, max-age=600, s-maxage=600' }
+            );
+          }
+          // DBにヒットなしで数値クエリならスクレイピングへ、それ以外は空で返す
+          if (!isNumeric) {
+            return jsonResponse({ results: [], source: 'd1' });
+          }
+        } catch (e) {
+          console.error('DB検索エラー:', e);
+        }
+      }
+
+      // フォールバック: 選手番号でスクレイピング
       const response = await fetch(
         `https://www.boatrace.jp/owpc/pc/data/racersearch/season?toban=${query}`,
         {
@@ -772,63 +903,57 @@ async function handleRequest(request) {
       );
 
       if (!response.ok) {
-        return new Response(
-          JSON.stringify({ results: [] }),
-          {
-            headers: {
-              ...corsHeaders,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        return jsonResponse({ results: [] });
       }
 
       const html = await response.text();
       const racerInfo = HTMLParser.parseRacerInfo(html);
 
-      return new Response(
-        JSON.stringify({
-          results: racerInfo ? [racerInfo] : [],
-        }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
+      return jsonResponse({ results: racerInfo ? [racerInfo] : [], source: 'scrape' });
+    }
+
+    // SG選出候補一覧（賞金ランキング順、DBから）
+    if (path === '/api/sg-candidates') {
+      if (hasDB(env)) {
+        try {
+          const { results } = await env.DB.prepare(
+            `SELECT r.racer_id, r.name, r.branch, r.rank, r.win_rate, r.avg_start_timing,
+                    p.sg_wins, p.g1_wins, p.g2_wins, p.general_wins,
+                    p.total_prize_money, p.prize_ranking,
+                    p.fan_vote_count, p.fan_vote_ranking
+               FROM racers r
+               LEFT JOIN racer_performances p ON r.racer_id = p.racer_id
+              WHERE p.prize_ranking IS NOT NULL
+              ORDER BY p.prize_ranking ASC`
+          ).all();
+
+          return jsonResponse(
+            { candidates: (results || []).map(mapRacerRow), source: 'd1' },
+            { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' }
+          );
+        } catch (e) {
+          console.error('SG候補取得エラー:', e);
+          return jsonResponse({ error: 'SG候補の取得に失敗しました', candidates: [] }, {}, 500);
         }
-      );
+      }
+      return jsonResponse({ candidates: [], source: 'none' });
     }
 
     // ルートが見つからない
-    return new Response(
-      JSON.stringify({ error: 'エンドポイントが見つかりません' }),
-      {
-        status: 404,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    return jsonResponse({ error: 'エンドポイントが見つかりません' }, {}, 404);
   } catch (error) {
     console.error('エラー:', error);
-    return new Response(
-      JSON.stringify({
-        error: 'サーバーエラーが発生しました',
-        message: error.message,
-      }),
-      {
-        status: 500,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+    return jsonResponse(
+      { error: 'サーバーエラーが発生しました', message: error.message },
+      {},
+      500
     );
   }
 }
 
-// Cloudflare Workers のエントリーポイント
-addEventListener('fetch', (event) => {
-  event.respondWith(handleRequest(event.request));
-});
+// Cloudflare Workers のエントリーポイント（ES Modules 形式: env.DB に対応）
+export default {
+  async fetch(request, env, ctx) {
+    return handleRequest(request, env);
+  },
+};
