@@ -55,6 +55,9 @@ export const RacerPage: React.FC = () => {
     grade: race.grade,
   }));
 
+  // DEBUG: レンダリング時のganttItems状態を確認（一時デバッグ）
+  console.log('🎯 RacerPage render - upcomingRaces.length:', upcomingRaces.length, 'ganttItems.length:', ganttItems.length);
+
   // 全体の期間を計算
   const today = new Date();
   const endDate = ganttItems.length > 0 ? ganttItems[ganttItems.length - 1].endDate : addDays(today, 90);
