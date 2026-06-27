@@ -56,10 +56,23 @@ export const RacerPage: React.FC = () => {
   }));
 
   // 全体の期間を計算
+  // 開始基準日 = 今日 と 最初のレース開始日 の早い方（過去開催中レースも入るため）
   const today = new Date();
-  const endDate = ganttItems.length > 0 ? ganttItems[ganttItems.length - 1].endDate : addDays(today, 90);
-  const totalDays = differenceInDays(endDate, today);
-  const daysToShow = Math.max(totalDays + 10, 90); // 最低90日分表示
+  today.setHours(0, 0, 0, 0);
+  const firstStart =
+    ganttItems.length > 0
+      ? ganttItems.reduce((min, it) => (it.startDate < min ? it.startDate : min), ganttItems[0].startDate)
+      : today;
+  const chartStart = firstStart < today ? firstStart : today;
+  const lastEnd =
+    ganttItems.length > 0
+      ? ganttItems.reduce((max, it) => (it.endDate > max ? it.endDate : max), ganttItems[0].endDate)
+      : addDays(today, 90);
+  const totalDays = Math.max(differenceInDays(lastEnd, chartStart) + 7, 30);
+  // 1日あたりの横幅(px)。期間をはっきり見せるため固定px方式にする
+  const DAY_WIDTH = 14;
+  const chartWidth = totalDays * DAY_WIDTH;
+  const LABEL_WIDTH = 200;
 
   // グレードに応じた色
   const getGradeColor = (grade: string) => {
@@ -112,37 +125,43 @@ export const RacerPage: React.FC = () => {
         <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>現在、出走予定はありません</p>
       ) : (
         <div style={{ overflowX: 'auto' }}>
-          {/* ガントチャート */}
-          <div style={{ minWidth: '800px' }}>
-            {/* ヘッダー（日付） */}
-            <div style={{ display: 'flex', marginBottom: '8px', paddingLeft: '200px' }}>
-              {Array.from({ length: Math.ceil(daysToShow / 7) }).map((_, weekIndex) => {
-                const weekStart = addDays(today, weekIndex * 7);
-                return (
-                  <div
-                    key={weekIndex}
-                    style={{
-                      flex: 1,
-                      minWidth: '100px',
-                      padding: '8px',
-                      textAlign: 'center',
-                      fontSize: '12px',
-                      borderLeft: '1px solid #ddd',
-                      backgroundColor: '#f8f9fa',
-                    }}
-                  >
-                    {format(weekStart, 'M/d', { locale: ja })}
-                  </div>
-                );
-              })}
+          {/* ガントチャート（1日 = 固定px方式） */}
+          <div style={{ width: `${LABEL_WIDTH + chartWidth}px`, minWidth: '100%' }}>
+            {/* ヘッダー（週単位の目盛り） */}
+            <div style={{ display: 'flex', marginBottom: '8px' }}>
+              <div style={{ width: `${LABEL_WIDTH}px`, flexShrink: 0 }} />
+              <div style={{ position: 'relative', width: `${chartWidth}px`, height: '28px' }}>
+                {Array.from({ length: Math.ceil(totalDays / 7) }).map((_, weekIndex) => {
+                  const weekStart = addDays(chartStart, weekIndex * 7);
+                  const left = weekIndex * 7 * DAY_WIDTH;
+                  return (
+                    <div
+                      key={weekIndex}
+                      style={{
+                        position: 'absolute',
+                        left: `${left}px`,
+                        top: 0,
+                        height: '100%',
+                        borderLeft: '1px solid #ddd',
+                        paddingLeft: '4px',
+                        fontSize: '11px',
+                        color: '#666',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {format(weekStart, 'M/d', { locale: ja })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             {/* ガントチャート本体 */}
             {ganttItems.map((item, index) => {
-              const daysFromToday = differenceInDays(item.startDate, today);
+              const daysFromStart = differenceInDays(item.startDate, chartStart);
               const duration = differenceInDays(item.endDate, item.startDate) + 1;
-              const leftPercent = (daysFromToday / daysToShow) * 100;
-              const widthPercent = (duration / daysToShow) * 100;
+              const left = daysFromStart * DAY_WIDTH;
+              const barWidth = Math.max(duration * DAY_WIDTH, 8);
 
               return (
                 <div
@@ -150,14 +169,14 @@ export const RacerPage: React.FC = () => {
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    marginBottom: '16px',
-                    position: 'relative',
+                    marginBottom: '12px',
                   }}
                 >
                   {/* レース情報（左側） */}
                   <div
                     style={{
-                      width: '200px',
+                      width: `${LABEL_WIDTH}px`,
+                      flexShrink: 0,
                       paddingRight: '16px',
                       fontSize: '14px',
                     }}
@@ -184,33 +203,61 @@ export const RacerPage: React.FC = () => {
                   {/* タイムライン */}
                   <div
                     style={{
-                      flex: 1,
-                      height: '40px',
+                      width: `${chartWidth}px`,
+                      flexShrink: 0,
+                      height: '36px',
                       backgroundColor: '#f8f9fa',
                       position: 'relative',
-                      border: '1px solid #ddd',
+                      border: '1px solid #eee',
                       borderRadius: '4px',
                     }}
                   >
-                    {/* バー */}
+                    {/* 週ごとの薄いグリッド線 */}
+                    {Array.from({ length: Math.ceil(totalDays / 7) }).map((_, w) => (
+                      <div
+                        key={w}
+                        style={{
+                          position: 'absolute',
+                          left: `${w * 7 * DAY_WIDTH}px`,
+                          top: 0,
+                          bottom: 0,
+                          borderLeft: '1px solid #eee',
+                        }}
+                      />
+                    ))}
+                    {/* バー（開催期間の幅） */}
+                    <div
+                      title={`${format(item.startDate, 'M/d', { locale: ja })} 〜 ${format(item.endDate, 'M/d', { locale: ja })}（${duration}日間）`}
+                      style={{
+                        position: 'absolute',
+                        left: `${left}px`,
+                        top: '4px',
+                        width: `${barWidth}px`,
+                        height: '28px',
+                        backgroundColor: getGradeColor(item.grade),
+                        borderRadius: '4px',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+                      }}
+                    />
+                    {/* 期間ラベル（バーの右隣に表示） */}
                     <div
                       style={{
                         position: 'absolute',
-                        left: `${Math.max(0, leftPercent)}%`,
-                        width: `${Math.min(100 - Math.max(0, leftPercent), widthPercent)}%`,
-                        height: '100%',
-                        backgroundColor: getGradeColor(item.grade),
-                        borderRadius: '4px',
+                        left: `${left + barWidth + 6}px`,
+                        top: '4px',
+                        height: '28px',
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center',
-                        color: 'white',
-                        fontSize: '12px',
+                        color: '#333',
+                        fontSize: '11px',
                         fontWeight: 'bold',
+                        whiteSpace: 'nowrap',
                       }}
                     >
-                      {format(item.startDate, 'M/d', { locale: ja })} -{' '}
-                      {format(item.endDate, 'M/d', { locale: ja })}
+                      {format(item.startDate, 'M/d', { locale: ja })}–{format(item.endDate, 'M/d', { locale: ja })}
+                      <span style={{ color: '#999', fontWeight: 'normal', marginLeft: '4px' }}>
+                        ({duration}日)
+                      </span>
                     </div>
                   </div>
                 </div>
