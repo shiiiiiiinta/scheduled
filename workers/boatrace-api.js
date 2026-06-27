@@ -125,36 +125,62 @@ class HTMLParser {
   }
 
   /**
-   * 出走予定をパース
+   * 出走予定（出場予定）をパース
+   * profile?toban=XXXX ページの「出場予定」テーブルから取得
+   * 戻り値: [{ date, venueName, venueCode, grade, raceName, raceUrl }]
    */
   static parseSchedule(html) {
     try {
       const races = [];
-      
-      // テーブル行を抽出
+
+      // class="is-S?a" のグレード判定マップ
+      const gradeFromClass = (rowHtml) => {
+        if (/is-SGa/.test(rowHtml)) return 'SG';
+        if (/is-G1[ab]/.test(rowHtml)) return 'G1';
+        if (/is-G2[ab]/.test(rowHtml)) return 'G2';
+        if (/is-G3[ab]/.test(rowHtml)) return 'G3';
+        return '一般';
+      };
+
+      // 各 <tr> を走査
       const tableRowRegex = /<tr[^>]*>([\s\S]*?)<\/tr>/g;
       let match;
 
       while ((match = tableRowRegex.exec(html)) !== null) {
         const rowHtml = match[1];
-        
-        // 日付を抽出
-        const dateMatch = rowHtml.match(/(\d{1,2})月(\d{1,2})日/);
+
+        // 日付（YYYY/MM/DD）を含む行だけが出走予定行
+        const dateMatch = rowHtml.match(/(\d{4})\/(\d{2})\/(\d{2})/);
         if (!dateMatch) continue;
 
-        // 場名を抽出
-        const venueMatch = rowHtml.match(/>(桐生|戸田|江戸川|平和島|多摩川|浜名湖|蒲郡|常滑|津|三国|びわこ|住之江|尼崎|鳴門|丸亀|児島|宮島|徳山|下関|若松|芦屋|福岡|唐津|大村)</);
-        const venueName = venueMatch ? venueMatch[1] : null;
+        const [, year, month, day] = dateMatch;
+        const dateStr = `${year}-${month}-${day}`; // ISO形式
 
-        // グレードを抽出
-        const gradeMatch = rowHtml.match(/>(SG|G1|G2|G3|一般)</);
-        const grade = gradeMatch ? gradeMatch[1] : '一般';
+        // レース場（img alt から）
+        const venueMatch = rowHtml.match(/<img[^>]*alt="([^"]+)"/);
+        const venueName = venueMatch ? venueMatch[1].trim() : null;
 
-        if (venueName) {
+        // jcd（場コード）と hd（開催日）を raceindex / racelist リンクから抽出
+        const jcdMatch = rowHtml.match(/jcd=(\d+)&(?:amp;)?hd=(\d{8})/);
+        const venueCode = jcdMatch ? jcdMatch[1] : null;
+        const hd = jcdMatch ? jcdMatch[2] : null;
+
+        // レースタイトル（is-alignL セル内の <a> テキスト）
+        const nameMatch = rowHtml.match(/is-alignL[^>]*>\s*<a[^>]*>([^<]+)<\/a>/);
+        const raceName = nameMatch ? nameMatch[1].trim() : null;
+
+        // グレード
+        const grade = gradeFromClass(rowHtml);
+
+        // レース場 or レース名のどちらかがあれば採用
+        if (venueName || raceName) {
           races.push({
-            date: `${dateMatch[1]}/${dateMatch[2]}`,
+            date: dateStr,
             venueName,
+            venueCode,
+            hd,
             grade,
+            raceName,
           });
         }
       }
@@ -361,6 +387,93 @@ function mapRacerRow(row) {
   };
 }
 
+// ============================================
+// 出走予定（スケジュール）の取得・保存
+// ============================================
+
+// boatrace.jp から選手の出走予定をスクレイピング
+async function fetchScheduleFromSite(racerId) {
+  const response = await fetch(
+    `https://www.boatrace.jp/owpc/pc/data/racersearch/profile?toban=${racerId}`,
+    {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`プロフィール取得失敗: ${response.status}`);
+  }
+  const html = await response.text();
+  return HTMLParser.parseSchedule(html);
+}
+
+// 出走予定を races / race_entries テーブルに保存
+async function saveScheduleToDB(env, racerId, schedule) {
+  for (const item of schedule) {
+    // race_id を一意に生成（場コード+開催日、無ければ日付+場名）
+    const raceId = item.venueCode && item.hd
+      ? `${item.venueCode}_${item.hd}`
+      : `${(item.date || '').replace(/-/g, '')}_${item.venueName || 'unknown'}`;
+
+    const startDate = item.date || null;
+
+    // races に upsert
+    await env.DB.prepare(
+      `INSERT INTO races (race_id, race_name, venue_name, venue_code, grade, start_date, end_date, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'scheduled')
+       ON CONFLICT(race_id) DO UPDATE SET
+         race_name=excluded.race_name,
+         venue_name=excluded.venue_name,
+         venue_code=excluded.venue_code,
+         grade=excluded.grade,
+         start_date=excluded.start_date,
+         updated_at=datetime('now')`
+    ).bind(
+      raceId,
+      item.raceName || '（タイトル未定）',
+      item.venueName || '不明',
+      item.venueCode || null,
+      item.grade || '一般',
+      startDate,
+      startDate
+    ).run();
+
+    // race_entries に upsert（UNIQUE(race_id, racer_id)）
+    await env.DB.prepare(
+      `INSERT OR IGNORE INTO race_entries (race_id, racer_id) VALUES (?, ?)`
+    ).bind(raceId, parseInt(racerId, 10)).run();
+  }
+
+  // 同期履歴を記録
+  await env.DB.prepare(
+    `INSERT INTO sync_history (sync_type, records_count, status, completed_at)
+     VALUES ('schedule', ?, 'success', datetime('now'))`
+  ).bind(schedule.length).run();
+}
+
+// DB から選手の出走予定を取得
+async function getScheduleFromDB(env, racerId) {
+  const { results } = await env.DB.prepare(
+    `SELECT r.race_id, r.race_name, r.venue_name, r.venue_code, r.grade,
+            r.start_date, r.end_date
+       FROM race_entries e
+       JOIN races r ON r.race_id = e.race_id
+      WHERE e.racer_id = ?
+      ORDER BY r.start_date ASC`
+  ).bind(parseInt(racerId, 10)).all();
+
+  return (results || []).map((row) => ({
+    raceId: row.race_id,
+    raceName: row.race_name,
+    venueName: row.venue_name,
+    venueCode: row.venue_code,
+    grade: row.grade,
+    startDate: row.start_date,
+    endDate: row.end_date,
+  }));
+}
+
 // JSON レスポンスのショートカット
 function jsonResponse(data, extraHeaders = {}, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -386,22 +499,41 @@ async function handleRequest(request, env) {
   }
 
   try {
-    // 選手情報取得
+    // 選手情報取得（選手情報 + 出走予定）
     if (path.startsWith('/api/racer/')) {
       const racerId = path.split('/').pop();
+      // ?refresh=1 で出走予定を強制再取得
+      const forceRefresh = url.searchParams.get('refresh') === '1';
 
       // まず DB から取得を試みる
       if (hasDB(env)) {
         const row = await dbGetRacer(env, racerId);
         if (row) {
+          // 出走予定を DB から取得
+          let schedule = await getScheduleFromDB(env, racerId);
+
+          // DBに出走予定が無い、または強制更新時はサイトから取得してDB保存
+          if (schedule.length === 0 || forceRefresh) {
+            try {
+              const scraped = await fetchScheduleFromSite(racerId);
+              if (scraped.length > 0) {
+                await saveScheduleToDB(env, racerId, scraped);
+                schedule = await getScheduleFromDB(env, racerId);
+              }
+            } catch (e) {
+              console.error('出走予定の取得/保存エラー:', e);
+              // 失敗してもDBの選手情報は返す
+            }
+          }
+
           return jsonResponse(
-            { racer: mapRacerRow(row), schedule: [], source: 'd1' },
-            { 'Cache-Control': 'public, max-age=3600, s-maxage=3600' }
+            { racer: mapRacerRow(row), schedule, source: 'd1' },
+            { 'Cache-Control': 'public, max-age=1800, s-maxage=1800' }
           );
         }
       }
 
-      // DB に無ければ boatrace.jp からフォールバック取得
+      // DB に選手が無ければ boatrace.jp からフォールバック取得
       const response = await fetch(
         `https://www.boatrace.jp/owpc/pc/data/racersearch/season?toban=${racerId}`,
         {
@@ -417,7 +549,12 @@ async function handleRequest(request, env) {
 
       const html = await response.text();
       const racerInfo = HTMLParser.parseRacerInfo(html);
-      const schedule = HTMLParser.parseSchedule(html);
+      let schedule = [];
+      try {
+        schedule = await fetchScheduleFromSite(racerId);
+      } catch (e) {
+        console.error('出走予定取得エラー:', e);
+      }
 
       return jsonResponse({ racer: racerInfo, schedule, source: 'scrape' });
     }

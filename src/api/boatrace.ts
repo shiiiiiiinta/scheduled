@@ -52,16 +52,30 @@ class BoatraceAPI {
       const scheduleData = response.data.schedule || [];
 
       // スケジュールデータを変換
-      const upcomingRaces: Race[] = scheduleData.map((item: any, index: number) => ({
-        id: `race-${index}`,
-        venueName: item.venueName,
-        venueCode: this.getVenueCodeByName(item.venueName),
-        raceName: `${item.venueName}${item.grade}`,
-        grade: item.grade,
-        startDate: this.parseScheduleDate(item.date),
-        endDate: this.parseScheduleDate(item.date, 5),
-        days: 6,
-      }));
+      // DB版は { raceId, raceName, venueName, grade, startDate(YYYY-MM-DD), endDate }
+      // 旧スクレイピング版は { venueName, grade, date } を返す（両対応）
+      const upcomingRaces: Race[] = scheduleData.map((item: any, index: number) => {
+        // startDate: ISO文字列(YYYY-MM-DD)があればそれを使う。無ければ旧date形式
+        const startISO: string = item.startDate
+          ? new Date(item.startDate).toISOString()
+          : this.parseScheduleDate(item.date);
+        const endISO: string = item.endDate
+          ? new Date(item.endDate).toISOString()
+          : (item.startDate
+              ? addDays(new Date(item.startDate), 5).toISOString()
+              : this.parseScheduleDate(item.date, 5));
+
+        return {
+          id: item.raceId || `race-${index}`,
+          venueName: item.venueName,
+          venueCode: item.venueCode || this.getVenueCodeByName(item.venueName),
+          raceName: item.raceName || `${item.venueName}${item.grade}`,
+          grade: item.grade,
+          startDate: startISO,
+          endDate: endISO,
+          days: 6,
+        };
+      });
 
       return { racer, upcomingRaces };
     } catch (error) {
