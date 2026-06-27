@@ -6,8 +6,60 @@ export const DiagnosticsPage: React.FC = () => {
   const [testResults, setTestResults] = useState<any>({});
   const [loading, setLoading] = useState(true);
 
+  // 全選手スケジュール同期の状態
+  const [syncing, setSyncing] = useState(false);
+  const [syncLog, setSyncLog] = useState<string[]>([]);
+
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
   const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true' || !API_BASE_URL;
+
+  // 全選手の出走予定を一括同期（ページングで自動的に最後まで実行）
+  const syncAllSchedules = async () => {
+    if (!API_BASE_URL || syncing) return;
+    setSyncing(true);
+    setSyncLog(['🔄 全選手スケジュール同期を開始します...']);
+
+    let offset = 0;
+    const limit = 15; // 1バッチあたりの選手数（サブリクエスト制限対策）
+    let totalProcessed = 0;
+    let totalSaved = 0;
+
+    try {
+      // done になるまでページングを繰り返す
+      // 無限ループ防止のため最大100バッチ
+      for (let i = 0; i < 100; i++) {
+        const res = await fetch(
+          `${API_BASE_URL}/api/sync-all-schedules?limit=${limit}&offset=${offset}`
+        );
+        if (!res.ok) {
+          throw new Error(`同期APIエラー: HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        totalProcessed += data.processed || 0;
+        totalSaved += data.savedRaces || 0;
+
+        setSyncLog((prev) => [
+          ...prev,
+          `📦 ${data.offset + 1}〜${data.offset + (data.processed || 0)}件目を処理 ` +
+            `(累計 ${totalProcessed}/${data.total} 選手, レース ${totalSaved} 件保存)` +
+            (data.errors && data.errors.length > 0 ? ` ⚠️エラー${data.errors.length}件` : ''),
+        ]);
+
+        if (data.done || data.nextOffset == null) {
+          setSyncLog((prev) => [
+            ...prev,
+            `✅ 完了！ 全 ${data.total} 選手を処理し、出走予定 ${totalSaved} 件をDBに保存しました。`,
+          ]);
+          break;
+        }
+        offset = data.nextOffset;
+      }
+    } catch (e: any) {
+      setSyncLog((prev) => [...prev, `❌ エラー: ${e.message}`]);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const runDiagnostics = async () => {
@@ -273,6 +325,60 @@ export const DiagnosticsPage: React.FC = () => {
               </>
             )}
           </section>
+
+          {/* 全選手スケジュール同期 */}
+          {API_BASE_URL && !USE_MOCK_DATA && (
+            <section
+              style={{
+                backgroundColor: '#fff',
+                border: '2px solid #28a745',
+                borderRadius: '4px',
+                padding: '20px',
+                marginTop: '30px',
+              }}
+            >
+              <h2 style={{ fontSize: '20px', marginBottom: '10px', color: '#155724' }}>
+                🗓️ 全選手の出走予定をDBに同期
+              </h2>
+              <p style={{ color: '#555', fontSize: '14px', marginBottom: '15px' }}>
+                DBに登録されている全選手について、boatrace.jp から出走予定（開催期間つき）を取得し、
+                D1データベースに保存します。選手数に応じて数十秒〜数分かかる場合があります。
+              </p>
+              <button
+                onClick={syncAllSchedules}
+                disabled={syncing}
+                style={{
+                  padding: '12px 24px',
+                  backgroundColor: syncing ? '#94d3a2' : '#28a745',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: syncing ? 'not-allowed' : 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                }}
+              >
+                {syncing ? '⏳ 同期中...' : '▶ 全選手スケジュールを同期する'}
+              </button>
+
+              {syncLog.length > 0 && (
+                <pre
+                  style={{
+                    marginTop: '15px',
+                    backgroundColor: '#f8f9fa',
+                    padding: '15px',
+                    borderRadius: '4px',
+                    fontSize: '12px',
+                    maxHeight: '300px',
+                    overflow: 'auto',
+                    whiteSpace: 'pre-wrap',
+                  }}
+                >
+                  {syncLog.join('\n')}
+                </pre>
+              )}
+            </section>
+          )}
 
           {/* Reload Button */}
           <div style={{ textAlign: 'center', marginTop: '30px' }}>
