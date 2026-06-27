@@ -77,7 +77,6 @@ class BoatraceAPI {
         };
       });
 
-      console.log('🔄 変換後 upcomingRaces:', JSON.stringify(upcomingRaces));
       return { racer, upcomingRaces };
     } catch (error) {
       console.error('❌ 出走予定の取得に失敗しました:', error);
