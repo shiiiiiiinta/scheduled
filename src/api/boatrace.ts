@@ -211,7 +211,9 @@ class BoatraceAPI {
   }
 
   // 獲得賞金ランキングを取得
-  async getPrizeRanking(): Promise<Array<{ rank: number; racerId: string; name: string; prizeMoney: number }>> {
+  async getPrizeRanking(): Promise<
+    Array<{ rank: number; racerId: string; name: string; prizeMoney: number; branch?: string; class?: string }>
+  > {
     try {
       const response = await this.apiClient.get('/api/prize-ranking');
       return response.data.rankings || [];

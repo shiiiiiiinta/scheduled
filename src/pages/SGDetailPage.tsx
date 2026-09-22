@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SG_SCHEDULE_2026 } from '../types/sg';
 import { SG_QUALIFICATION_CRITERIA, evaluateQualification } from '../utils/sgQualification';
+import { SG_DISPLAY_CONFIG } from '../utils/sgDisplayConfig';
 import type { SGRaceType, QualificationResult } from '../types/sg';
 import { boatraceAPI } from '../api/boatrace';
 
@@ -12,6 +13,8 @@ import { getMockRacerPerformances } from '../api/mockData';
 interface EntryRow {
   racerId: string;
   name: string;
+  rankClass?: string;   // 級別（A1など）
+  branch?: string;      // 支部
   prizeRank?: number;
   prizeMoney?: number;
   fanVoteRank?: number;
@@ -68,6 +71,10 @@ export default function SGDetailPage() {
         const voteMap = new Map(
           fanVoteRanking.map((r) => [r.racerId, { rank: r.rank, votes: r.votes }])
         );
+        // 級別・支部の付与用（賞金ランキングから取得できる）
+        const metaMap = new Map(
+          prizeRanking.map((r) => [r.racerId, { branch: r.branch, rankClass: r.class }])
+        );
         setPrizeRankingMap(prizeMap);
         setFanVoteMap(voteMap);
 
@@ -84,9 +91,12 @@ export default function SGDetailPage() {
           const rows: EntryRow[] = rawEntries.map((e) => {
             const prize = prizeMap.get(e.racerId);
             const vote = voteMap.get(e.racerId);
+            const meta = metaMap.get(e.racerId);
             return {
               racerId: e.racerId,
               name: e.name,
+              rankClass: meta?.rankClass,
+              branch: meta?.branch,
               prizeRank: prize?.rank,
               prizeMoney: prize?.prizeMoney,
               fanVoteRank: vote?.rank,
@@ -171,16 +181,16 @@ export default function SGDetailPage() {
   const displayResults = qualificationResults;
   const qualifiedCount = qualificationResults.filter((r) => r.qualified).length;
 
-  // このレースが順位系の条件（ファン投票 / 賞金 / 得点など）を持つか判定
-  const usesFanVote = criteria?.criteria.some((c) => c.method.includes('ファン投票')) ?? false;
-  const usesPrize = ['CHALLENGE_CUP', 'GRAND_PRIX'].includes(sgTypeUpper);
+  // レースごとの表示設定（主軸・表示列・選出区分ラベル）
+  const displayConfig = SG_DISPLAY_CONFIG[sgTypeUpper];
+  const usesFanVote = displayConfig?.primaryAxis === 'fanVote';
+  const totalSlots = criteria?.totalSlots ?? 52;
 
-  // 実出場選手を「主たる順位条件」でソート
+  // 実出場選手を主軸（賞金 or ファン投票）でソート
   const sortedEntries = [...entries].sort((a, b) => {
     if (usesFanVote) {
       return (a.fanVoteRank ?? 9999) - (b.fanVoteRank ?? 9999);
     }
-    // 既定は賞金ランキング順
     return (a.prizeRank ?? 9999) - (b.prizeRank ?? 9999);
   });
 
@@ -365,11 +375,7 @@ export default function SGDetailPage() {
                 {status === 'finished'
                   ? 'このレースは終了しています。実際に出場した全選手を表示しています。'
                   : 'boatrace.jp で発表済みの出場予定選手を表示しています。'}
-                {usesFanVote
-                  ? '（ファン投票順に並べ、投票順位を表示）'
-                  : usesPrize
-                  ? '（獲得賞金ランキング順に並べ、順位を表示）'
-                  : '（獲得賞金ランキング順に表示）'}
+                {displayConfig?.note ? ` ${displayConfig.note}` : ''}
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
@@ -377,21 +383,28 @@ export default function SGDetailPage() {
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>#</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>選手名</th>
                     <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>登録番号</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>
-                      獲得賞金{usesPrize && '（順位）'}
-                    </th>
-                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>
-                      ファン投票{usesFanVote && '（順位）'}
-                    </th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>選出条件との合致</th>
+                    {displayConfig?.showRankClass && (
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>級別</th>
+                    )}
+                    {displayConfig?.showBranch && (
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>支部</th>
+                    )}
+                    {displayConfig?.showPrize && (
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>獲得賞金（順位）</th>
+                    )}
+                    {displayConfig?.showFanVote && (
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>ファン投票（順位）</th>
+                    )}
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>選出区分</th>
                   </tr>
                 </thead>
                 <tbody>
                   {sortedEntries.map((e, index) => {
-                    // 主たる順位条件への合致判定
                     const rankForCriteria = usesFanVote ? e.fanVoteRank : e.prizeRank;
-                    const totalSlots = criteria?.totalSlots ?? 52;
                     const withinSlots = typeof rankForCriteria === 'number' && rankForCriteria <= totalSlots;
+                    const categoryText = displayConfig
+                      ? displayConfig.categoryLabel(e, index, totalSlots)
+                      : '—';
                     return (
                       <tr
                         key={e.racerId}
@@ -409,50 +422,62 @@ export default function SGDetailPage() {
                           </span>
                         </td>
                         <td style={{ padding: '14px 16px', color: '#666' }}>{e.racerId}</td>
-                        <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                          {typeof e.prizeMoney === 'number' ? (
-                            <div style={{ fontSize: '14px' }}>
-                              <div style={{ fontWeight: 'bold', color: '#28a745' }}>¥{e.prizeMoney.toLocaleString()}</div>
-                              {typeof e.prizeRank === 'number' && (
-                                <div style={{ fontSize: '12px', color: '#6c757d' }}>{e.prizeRank}位</div>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ color: '#adb5bd' }}>-</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                          {typeof e.fanVotes === 'number' ? (
-                            <div style={{ fontSize: '14px' }}>
-                              <div style={{ fontWeight: 'bold', color: '#6f42c1' }}>{e.fanVotes.toLocaleString()}票</div>
-                              {typeof e.fanVoteRank === 'number' && (
-                                <div style={{ fontSize: '12px', color: '#6c757d' }}>{e.fanVoteRank}位</div>
-                              )}
-                            </div>
-                          ) : (
-                            <span style={{ color: '#adb5bd' }}>-</span>
-                          )}
-                        </td>
-                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                          {typeof rankForCriteria === 'number' ? (
-                            <span
-                              style={{
-                                padding: '6px 12px',
-                                backgroundColor: withinSlots ? '#d4edda' : '#fff3cd',
-                                color: withinSlots ? '#155724' : '#856404',
-                                borderRadius: '12px',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                              }}
-                            >
-                              {usesFanVote ? 'ファン投票' : '賞金'}{rankForCriteria}位
-                              {withinSlots ? ` ✓ 条件内(上位${totalSlots})` : ` △ 条件外`}
-                            </span>
-                          ) : (
-                            <span style={{ padding: '6px 12px', backgroundColor: '#e2e3e5', color: '#6c757d', borderRadius: '12px', fontSize: '12px' }}>
-                              ランキング対象外
-                            </span>
-                          )}
+                        {displayConfig?.showRankClass && (
+                          <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                            {e.rankClass ? (
+                              <span style={{ padding: '2px 10px', backgroundColor: '#007bff', color: 'white', borderRadius: '10px', fontSize: '12px', fontWeight: 'bold' }}>
+                                {e.rankClass}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#adb5bd' }}>-</span>
+                            )}
+                          </td>
+                        )}
+                        {displayConfig?.showBranch && (
+                          <td style={{ padding: '14px 16px', color: '#495057' }}>{e.branch || '-'}</td>
+                        )}
+                        {displayConfig?.showPrize && (
+                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            {typeof e.prizeMoney === 'number' ? (
+                              <div style={{ fontSize: '14px' }}>
+                                <div style={{ fontWeight: 'bold', color: '#28a745' }}>¥{e.prizeMoney.toLocaleString()}</div>
+                                {typeof e.prizeRank === 'number' && (
+                                  <div style={{ fontSize: '12px', color: '#6c757d' }}>{e.prizeRank}位</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#adb5bd' }}>-</span>
+                            )}
+                          </td>
+                        )}
+                        {displayConfig?.showFanVote && (
+                          <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                            {typeof e.fanVotes === 'number' ? (
+                              <div style={{ fontSize: '14px' }}>
+                                <div style={{ fontWeight: 'bold', color: '#6f42c1' }}>{e.fanVotes.toLocaleString()}票</div>
+                                {typeof e.fanVoteRank === 'number' && (
+                                  <div style={{ fontSize: '12px', color: '#6c757d' }}>{e.fanVoteRank}位</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span style={{ color: '#adb5bd' }}>-</span>
+                            )}
+                          </td>
+                        )}
+                        <td style={{ padding: '14px 16px' }}>
+                          <span
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: withinSlots ? '#d4edda' : '#f1f3f5',
+                              color: withinSlots ? '#155724' : '#495057',
+                              borderRadius: '12px',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              display: 'inline-block',
+                            }}
+                          >
+                            {categoryText}
+                          </span>
                         </td>
                       </tr>
                     );
