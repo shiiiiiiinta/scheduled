@@ -1,14 +1,97 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SG_SCHEDULE_2026 } from '../types/sg';
-import type { SGRace } from '../types/sg';
+import type { SGRace, SGRaceType } from '../types/sg';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+const USE_MOCK_DATA = import.meta.env.VITE_USE_MOCK_DATA === 'true' || !API_BASE_URL;
+
+// APIのレース名から SGRaceType を判定
+const detectSGType = (raceName: string): SGRaceType | null => {
+  const n = raceName;
+  if (n.includes('クラシック') || n.includes('総理大臣') || n.includes('鳳凰')) return 'CLASSIC';
+  if (n.includes('オールスター') || n.includes('笹川')) return 'ALL_STAR';
+  if (n.includes('グランドチャンピオン')) return 'GRAND_CHAMPION';
+  if (n.includes('オーシャン')) return 'OCEAN_CUP';
+  if (n.includes('メモリアル')) return 'MEMORIAL';
+  if (n.includes('ダービー') || n.includes('全日本選手権')) return 'DERBY';
+  if (n.includes('チャレンジ')) return 'CHALLENGE_CUP';
+  if (n.includes('グランプリ') || n.includes('賞金王')) return 'GRAND_PRIX';
+  return null;
+};
 
 export default function SGListPage() {
   const navigate = useNavigate();
   const [selectedYear, setSelectedYear] = useState<number>(2026);
+  const [races, setRaces] = useState<SGRace[]>(SG_SCHEDULE_2026);
+  const [loading, setLoading] = useState(false);
+  const [dataSource, setDataSource] = useState<'api' | 'static'>('static');
+
+  // 年度が変わるたびに実データ（boatrace.jp由来）を取得して日程・会場を上書き
+  useEffect(() => {
+    const fetchRealSchedule = async () => {
+      if (USE_MOCK_DATA) {
+        // モックモードは静的データのまま
+        setRaces(SG_SCHEDULE_2026);
+        setDataSource('static');
+        return;
+      }
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/races/sg?year=${selectedYear}`);
+        const data = await res.json();
+        const apiRaces: any[] = data.races || [];
+
+        // 静的メタデータ（優勝賞金・出場資格・正式名）をベースに、
+        // APIの実データ（開催日・会場）を type で突き合わせて上書き
+        const merged: SGRace[] = SG_SCHEDULE_2026.map((base) => {
+          const match = apiRaces.find((r) => detectSGType(r.raceName) === base.type);
+          if (match) {
+            return {
+              ...base,
+              startDate: (match.startDate || base.startDate).slice(0, 10),
+              endDate: (match.endDate || base.endDate).slice(0, 10),
+              venue: match.venueName || base.venue,
+              venueCode: match.venueCode || base.venueCode,
+            };
+          }
+          return base;
+        });
+
+        // APIが返したがメタに無いSG（新設レース等）は補完
+        for (const r of apiRaces) {
+          const t = detectSGType(r.raceName);
+          if (t && !merged.some((m) => m.type === t)) {
+            merged.push({
+              id: `${t.toLowerCase()}-${selectedYear}`,
+              type: t,
+              name: r.raceName,
+              fullName: r.raceName,
+              startDate: (r.startDate || '').slice(0, 10),
+              endDate: (r.endDate || '').slice(0, 10),
+              venue: r.venueName || '',
+              venueCode: r.venueCode || '',
+              prizeMoney: 0,
+              qualificationCriteria: '—',
+            });
+          }
+        }
+
+        setRaces(merged);
+        setDataSource(apiRaces.length > 0 ? 'api' : 'static');
+      } catch (e) {
+        console.error('SGスケジュール取得エラー:', e);
+        setRaces(SG_SCHEDULE_2026);
+        setDataSource('static');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRealSchedule();
+  }, [selectedYear]);
 
   // 開催日順にソート
-  const sortedRaces = [...SG_SCHEDULE_2026].sort((a, b) => {
+  const sortedRaces = [...races].sort((a, b) => {
     return new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
   });
 
@@ -61,10 +144,16 @@ export default function SGListPage() {
         </button>
 
         <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>
-          🚤 SG競走スケジュール 2026
+          🚤 SG競走スケジュール {selectedYear}
         </h1>
         <p style={{ color: '#666', fontSize: '16px' }}>
           最高峰のレースカレンダー - 全8大会の開催情報と出場資格
+          {loading && <span style={{ marginLeft: '8px', color: '#dc3545' }}>（読み込み中...）</span>}
+          {!loading && dataSource === 'api' && (
+            <span style={{ marginLeft: '8px', color: '#28a745', fontSize: '13px' }}>
+              ✓ boatrace.jp の最新日程を反映
+            </span>
+          )}
         </p>
       </div>
 
