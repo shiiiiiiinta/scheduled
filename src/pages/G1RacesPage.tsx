@@ -73,8 +73,10 @@ export const G1RacesPage: React.FC = () => {
         ← 戻る
       </button>
 
-      <h1 style={{ marginBottom: '8px' }}>向こう3ヶ月のG1以上のレース</h1>
-      <p style={{ marginBottom: '32px', color: '#666' }}>レースをタップすると出場選手一覧が表示されます</p>
+      <h1 style={{ marginBottom: '8px' }}>SG・G1レース開催スケジュール</h1>
+      <p style={{ marginBottom: '32px', color: '#666' }}>
+        boatrace.jp のグレード別スケジュールに基づく開催予定です。レースをタップすると出場選手一覧が表示されます
+      </p>
 
       {races.length === 0 ? (
         <p style={{ color: '#666', textAlign: 'center', padding: '40px' }}>該当するレースがありません</p>

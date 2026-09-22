@@ -107,16 +107,24 @@ class BoatraceAPI {
       console.log('✅ G1レース取得成功:', response.data);
       const racesData = response.data.races || [];
 
-      return racesData.map((item: any, index: number) => ({
-        id: `race-${index}`,
-        venueName: item.venueName,
-        venueCode: this.getVenueCodeByName(item.venueName),
-        raceName: item.raceName,
-        grade: item.grade,
-        startDate: item.startDate || new Date().toISOString(),
-        endDate: item.endDate || addDays(new Date(), 6).toISOString(),
-        days: 6,
-      }));
+      return racesData.map((item: any, index: number) => {
+        const startISO = item.startDate || new Date().toISOString();
+        const endISO = item.endDate || addDays(new Date(), 6).toISOString();
+        const dayCount = Math.max(
+          1,
+          Math.round((new Date(endISO).getTime() - new Date(startISO).getTime()) / (1000 * 60 * 60 * 24)) + 1
+        );
+        return {
+          id: item.raceId || `race-${index}`,
+          venueName: item.venueName,
+          venueCode: item.venueCode || this.getVenueCodeByName(item.venueName),
+          raceName: item.raceName,
+          grade: item.grade,
+          startDate: startISO,
+          endDate: endISO,
+          days: dayCount,
+        };
+      });
     } catch (error) {
       console.error('❌ レース一覧の取得に失敗しました:', error);
       console.log('⚠️ モックデータにフォールバック');
