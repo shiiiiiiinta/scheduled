@@ -1,12 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { SG_SCHEDULE_2026 } from '../types/sg';
-import { SG_QUALIFICATION_CRITERIA, evaluateQualification, getQualifiedWithMargin } from '../utils/sgQualification';
+import { SG_QUALIFICATION_CRITERIA, evaluateQualification } from '../utils/sgQualification';
 import type { SGRaceType, QualificationResult } from '../types/sg';
 import { boatraceAPI } from '../api/boatrace';
 
 // モックデータ（フォールバック用）
 import { getMockRacerPerformances } from '../api/mockData';
+
+// 出場選手（実データ）の表示用型
+interface EntryRow {
+  racerId: string;
+  name: string;
+  prizeRank?: number;
+  prizeMoney?: number;
+  fanVoteRank?: number;
+  fanVotes?: number;
+}
+
+type RaceStatus = 'finished' | 'ongoing' | 'upcoming';
 
 export default function SGDetailPage() {
   const { sgType } = useParams<{ sgType: string }>();
@@ -16,96 +28,108 @@ export default function SGDetailPage() {
   const [prizeRankingMap, setPrizeRankingMap] = useState<Map<string, { rank: number; prizeMoney: number }>>(new Map());
   const [fanVoteMap, setFanVoteMap] = useState<Map<string, { rank: number; votes: number }>>(new Map());
 
+  // 実出場選手（boatrace.jp から取得）
+  const [entries, setEntries] = useState<EntryRow[]>([]);
+  const [entriesAnnounced, setEntriesAnnounced] = useState<boolean>(false);
+
   const sgTypeUpper = sgType?.toUpperCase() as SGRaceType;
   const race = SG_SCHEDULE_2026.find((r) => r.type === sgTypeUpper);
   const criteria = race ? SG_QUALIFICATION_CRITERIA[race.type] : null;
 
-  // 初回ロード：全選手データを一括取得
+  // 開催ステータス（終了 / 開催中 / これから）
+  const getStatus = (): RaceStatus => {
+    if (!race) return 'upcoming';
+    const now = new Date();
+    const start = new Date(race.startDate);
+    const end = new Date(race.endDate);
+    end.setHours(23, 59, 59);
+    if (now > end) return 'finished';
+    if (now >= start) return 'ongoing';
+    return 'upcoming';
+  };
+  const status = getStatus();
+  const statusLabel = status === 'finished' ? '終了' : status === 'ongoing' ? '開催中' : 'これから開催';
+
+  // 初回ロード：出場選手（実データ）＋ランキングを取得
   useEffect(() => {
     const fetchAllData = async () => {
+      if (!race) return;
       setLoading(true);
       try {
-        // 賞金ランキングとファン投票ランキングを取得
+        // 賞金ランキング・ファン投票ランキング（順位付与用）
         const [prizeRanking, fanVoteRanking] = await Promise.all([
           boatraceAPI.getPrizeRanking(),
           boatraceAPI.getFanVoteRanking(),
         ]);
 
-        // Mapに変換
         const prizeMap = new Map(
-          prizeRanking.map((r) => [
-            r.racerId,
-            { rank: r.rank, prizeMoney: r.prizeMoney },
-          ])
+          prizeRanking.map((r) => [r.racerId, { rank: r.rank, prizeMoney: r.prizeMoney }])
         );
         const voteMap = new Map(
-          fanVoteRanking.map((r) => [
-            r.racerId,
-            { rank: r.rank, votes: r.votes },
-          ])
+          fanVoteRanking.map((r) => [r.racerId, { rank: r.rank, votes: r.votes }])
         );
-
         setPrizeRankingMap(prizeMap);
         setFanVoteMap(voteMap);
 
-        // 🎯 賞金ランキングとファン投票から実際のID取得
-        const prizeRankerIds = prizeRanking.slice(0, 50).map((r) => r.racerId);
-        const fanVoteIds = fanVoteRanking.slice(0, 30).map((r) => r.racerId);
-        
-        // 重複を除去して結合
-        const uniqueIds = Array.from(new Set([...prizeRankerIds, ...fanVoteIds]));
-        
-        console.log(`実際の選手ID取得: 賞金ランキング${prizeRankerIds.length}名、ファン投票${fanVoteIds.length}名、ユニーク${uniqueIds.length}名`);
+        // 実出場選手を boatrace.jp から取得
+        // 初日(hd) = startDate を YYYYMMDD に、jcd = venueCode
+        const hd = race.startDate.replace(/-/g, '');
+        const jcd = race.venueCode;
+        const { entries: rawEntries, announced } = await boatraceAPI.getSGEntries(jcd, hd);
 
-        // Worker APIから選手成績を取得（最大20名ずつバッチ処理）
-        const batchSize = 20;
-        let racerPerformances = [];
-        
-        console.log(`全選手データ取得開始: ${uniqueIds.length}名を${Math.ceil(uniqueIds.length / batchSize)}バッチで処理`);
-        
-        for (let i = 0; i < uniqueIds.length; i += batchSize) {
-          const batch = uniqueIds.slice(i, i + batchSize);
-          const batchNumber = Math.floor(i / batchSize) + 1;
-          const totalBatches = Math.ceil(uniqueIds.length / batchSize);
-          
-          console.log(`バッチ${batchNumber}/${totalBatches} 処理中...`);
-          
-          try {
-            const performances = await boatraceAPI.getRacerPerformances(batch);
-            
-            // 公式データで賞金と投票を上書き
-            performances.forEach((p) => {
-              const prize = prizeMap.get(p.racerId);
-              const vote = voteMap.get(p.racerId);
-              if (prize) {
-                p.totalPrizeMoney = prize.prizeMoney;
-                p.prizeRanking = prize.rank;
-              }
-              if (vote) {
-                p.fanVotes = vote.votes;
-              }
-            });
-            
-            racerPerformances.push(...performances);
-            console.log(`バッチ${batchNumber}完了: ${performances.length}名取得（合計: ${racerPerformances.length}名）`);
-          } catch (error) {
-            console.error(`バッチ${batchNumber}の取得に失敗:`, error);
+        setEntriesAnnounced(announced);
+
+        if (announced && rawEntries.length > 0) {
+          // 実出場選手に順位情報を付与（全員表示・件数制限なし）
+          const rows: EntryRow[] = rawEntries.map((e) => {
+            const prize = prizeMap.get(e.racerId);
+            const vote = voteMap.get(e.racerId);
+            return {
+              racerId: e.racerId,
+              name: e.name,
+              prizeRank: prize?.rank,
+              prizeMoney: prize?.prizeMoney,
+              fanVoteRank: vote?.rank,
+              fanVotes: vote?.votes,
+            };
+          });
+          setEntries(rows);
+          setQualificationResults([]); // 実データがあるときはシミュレーション不要
+        } else {
+          // 出場選手が未発表（これから開催で番組未確定）→ シミュレーション表示
+          setEntries([]);
+          const prizeRankerIds = prizeRanking.map((r) => r.racerId);
+          const fanVoteIds = fanVoteRanking.map((r) => r.racerId);
+          const uniqueIds = Array.from(new Set([...prizeRankerIds, ...fanVoteIds]));
+
+          const batchSize = 20;
+          let racerPerformances: any[] = [];
+          for (let i = 0; i < uniqueIds.length; i += batchSize) {
+            const batch = uniqueIds.slice(i, i + batchSize);
+            try {
+              const performances = await boatraceAPI.getRacerPerformances(batch);
+              performances.forEach((p: any) => {
+                const prize = prizeMap.get(p.racerId);
+                const vote = voteMap.get(p.racerId);
+                if (prize) {
+                  p.totalPrizeMoney = prize.prizeMoney;
+                  p.prizeRanking = prize.rank;
+                }
+                if (vote) p.fanVotes = vote.votes;
+              });
+              racerPerformances.push(...performances);
+            } catch (error) {
+              console.error('選手成績バッチ取得に失敗:', error);
+            }
           }
+          if (racerPerformances.length === 0) {
+            racerPerformances = getMockRacerPerformances();
+          }
+          const results = evaluateQualification(racerPerformances, sgTypeUpper);
+          setQualificationResults(results);
         }
-
-        // データが取得できなかった場合はモックデータを使用
-        if (racerPerformances.length === 0) {
-          console.warn('本番データの取得に失敗したため、モックデータを使用します');
-          racerPerformances = getMockRacerPerformances();
-        }
-
-        console.log(`全選手データ取得完了: ${racerPerformances.length}名`);
-        
-        const results = evaluateQualification(racerPerformances, sgTypeUpper);
-        setQualificationResults(results);
       } catch (error) {
         console.error('データ取得エラー:', error);
-        // エラー時はモックデータを使用
         const racerPerformances = getMockRacerPerformances();
         const results = evaluateQualification(racerPerformances, sgTypeUpper);
         setQualificationResults(results);
@@ -143,11 +167,22 @@ export default function SGDetailPage() {
     );
   }
 
-  // ボーダーライン+10位までを取得
-  const displayResults = getQualifiedWithMargin(qualificationResults, 10);
-
+  // シミュレーション時は全件表示（件数制限なし）
+  const displayResults = qualificationResults;
   const qualifiedCount = qualificationResults.filter((r) => r.qualified).length;
-  const borderlineCount = displayResults.length - qualifiedCount;
+
+  // このレースが順位系の条件（ファン投票 / 賞金 / 得点など）を持つか判定
+  const usesFanVote = criteria?.criteria.some((c) => c.method.includes('ファン投票')) ?? false;
+  const usesPrize = ['CHALLENGE_CUP', 'GRAND_PRIX'].includes(sgTypeUpper);
+
+  // 実出場選手を「主たる順位条件」でソート
+  const sortedEntries = [...entries].sort((a, b) => {
+    if (usesFanVote) {
+      return (a.fanVoteRank ?? 9999) - (b.fanVoteRank ?? 9999);
+    }
+    // 既定は賞金ランキング順
+    return (a.prizeRank ?? 9999) - (b.prizeRank ?? 9999);
+  });
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
@@ -170,7 +205,22 @@ export default function SGDetailPage() {
             ← SG一覧へ戻る
           </button>
 
-          <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>{race.fullName}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px', flexWrap: 'wrap' }}>
+            <h1 style={{ fontSize: '28px', fontWeight: 'bold', margin: 0 }}>{race.fullName}</h1>
+            <span
+              style={{
+                padding: '4px 12px',
+                borderRadius: '12px',
+                fontSize: '13px',
+                fontWeight: 'bold',
+                backgroundColor:
+                  status === 'ongoing' ? '#ffc107' : status === 'finished' ? 'rgba(255,255,255,0.3)' : '#28a745',
+                color: status === 'ongoing' ? '#000' : '#fff',
+              }}
+            >
+              {statusLabel}
+            </span>
+          </div>
           <p style={{ opacity: 0.9, fontSize: '16px' }}>
             {new Date(race.startDate).toLocaleDateString('ja-JP')} ～{' '}
             {new Date(race.endDate).toLocaleDateString('ja-JP')} @ {race.venue}
@@ -274,10 +324,18 @@ export default function SGDetailPage() {
         {/* 選出順位一覧 */}
         <div style={{ backgroundColor: 'white', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)', overflow: 'hidden' }}>
           <div style={{ backgroundColor: '#495057', padding: '20px 24px' }}>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>選出順位一覧</span>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+              <span>
+                {entriesAnnounced
+                  ? status === 'finished'
+                    ? '出場選手一覧（確定）'
+                    : '出場予定選手一覧'
+                  : '選出順位シミュレーション'}
+              </span>
               <span style={{ fontSize: '14px', fontWeight: 'normal' }}>
-                資格者: {qualifiedCount}名 / ボーダー付近: +{borderlineCount}名
+                {entriesAnnounced
+                  ? `出場 ${sortedEntries.length}名`
+                  : `資格者(見込): ${qualifiedCount}名 / 全${displayResults.length}名`}
               </span>
             </h2>
           </div>
@@ -295,12 +353,119 @@ export default function SGDetailPage() {
                   animation: 'spin 1s linear infinite',
                 }}
               ></div>
-              <p style={{ marginTop: '16px', color: '#666', fontSize: '16px', fontWeight: 'bold' }}>全選手データを読み込み中...</p>
-              <p style={{ marginTop: '8px', fontSize: '14px', color: '#999' }}>約75名の選手データを取得しています</p>
+              <p style={{ marginTop: '16px', color: '#666', fontSize: '16px', fontWeight: 'bold' }}>
+                {status === 'finished' ? '出場選手データを読み込み中...' : '選手データを読み込み中...'}
+              </p>
               <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
             </div>
+          ) : entriesAnnounced ? (
+            // ===== 実出場選手一覧（全員表示） =====
+            <div style={{ overflowX: 'auto' }}>
+              <div style={{ padding: '12px 24px', fontSize: '13px', color: '#666', backgroundColor: '#f0f7ff' }}>
+                {status === 'finished'
+                  ? 'このレースは終了しています。実際に出場した全選手を表示しています。'
+                  : 'boatrace.jp で発表済みの出場予定選手を表示しています。'}
+                {usesFanVote
+                  ? '（ファン投票順に並べ、投票順位を表示）'
+                  : usesPrize
+                  ? '（獲得賞金ランキング順に並べ、順位を表示）'
+                  : '（獲得賞金ランキング順に表示）'}
+              </div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f8f9fa', borderBottom: '2px solid #dee2e6' }}>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>#</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>選手名</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>登録番号</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>
+                      獲得賞金{usesPrize && '（順位）'}
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>
+                      ファン投票{usesFanVote && '（順位）'}
+                    </th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '14px', fontWeight: 'bold', color: '#495057' }}>選出条件との合致</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedEntries.map((e, index) => {
+                    // 主たる順位条件への合致判定
+                    const rankForCriteria = usesFanVote ? e.fanVoteRank : e.prizeRank;
+                    const totalSlots = criteria?.totalSlots ?? 52;
+                    const withinSlots = typeof rankForCriteria === 'number' && rankForCriteria <= totalSlots;
+                    return (
+                      <tr
+                        key={e.racerId}
+                        style={{ borderBottom: '1px solid #e0e0e0', backgroundColor: index % 2 === 0 ? 'white' : '#fbfbfb' }}
+                      >
+                        <td style={{ padding: '14px 16px', fontWeight: 'bold', color: '#333' }}>{index + 1}</td>
+                        <td style={{ padding: '14px 16px' }}>
+                          <span
+                            onClick={() => navigate(`/racer/${e.racerId}`)}
+                            style={{ color: '#007bff', cursor: 'pointer', fontWeight: 'bold' }}
+                            onMouseEnter={(ev) => (ev.currentTarget.style.textDecoration = 'underline')}
+                            onMouseLeave={(ev) => (ev.currentTarget.style.textDecoration = 'none')}
+                          >
+                            {e.name}
+                          </span>
+                        </td>
+                        <td style={{ padding: '14px 16px', color: '#666' }}>{e.racerId}</td>
+                        <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                          {typeof e.prizeMoney === 'number' ? (
+                            <div style={{ fontSize: '14px' }}>
+                              <div style={{ fontWeight: 'bold', color: '#28a745' }}>¥{e.prizeMoney.toLocaleString()}</div>
+                              {typeof e.prizeRank === 'number' && (
+                                <div style={{ fontSize: '12px', color: '#6c757d' }}>{e.prizeRank}位</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ color: '#adb5bd' }}>-</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'right' }}>
+                          {typeof e.fanVotes === 'number' ? (
+                            <div style={{ fontSize: '14px' }}>
+                              <div style={{ fontWeight: 'bold', color: '#6f42c1' }}>{e.fanVotes.toLocaleString()}票</div>
+                              {typeof e.fanVoteRank === 'number' && (
+                                <div style={{ fontSize: '12px', color: '#6c757d' }}>{e.fanVoteRank}位</div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ color: '#adb5bd' }}>-</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                          {typeof rankForCriteria === 'number' ? (
+                            <span
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: withinSlots ? '#d4edda' : '#fff3cd',
+                                color: withinSlots ? '#155724' : '#856404',
+                                borderRadius: '12px',
+                                fontSize: '12px',
+                                fontWeight: 'bold',
+                              }}
+                            >
+                              {usesFanVote ? 'ファン投票' : '賞金'}{rankForCriteria}位
+                              {withinSlots ? ` ✓ 条件内(上位${totalSlots})` : ` △ 条件外`}
+                            </span>
+                          ) : (
+                            <span style={{ padding: '6px 12px', backgroundColor: '#e2e3e5', color: '#6c757d', borderRadius: '12px', fontSize: '12px' }}>
+                              ランキング対象外
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : (
+            // ===== シミュレーション（出場選手未発表のレース）：全件表示 =====
             <>
+              <div style={{ padding: '12px 24px', fontSize: '13px', color: '#856404', backgroundColor: '#fff8e1' }}>
+                このレースはまだ出場選手が発表されていません。獲得賞金・ファン投票ランキングに基づく選出見込み（全{displayResults.length}名）を表示しています。
+              </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                   <thead>
@@ -318,56 +483,27 @@ export default function SGDetailPage() {
                   <tbody>
                     {displayResults.map((result, index) => {
                       const isQualified = result.qualified;
-                      const isBorderline = !isQualified && index < displayResults.length;
-                      const rowBg = isQualified
-                        ? (index < 3 ? '#fffbf0' : 'white')
-                        : '#f8f9fa';
-
+                      const rowBg = isQualified ? (index < 3 ? '#fffbf0' : 'white') : '#f8f9fa';
                       return (
-                        <tr
-                          key={result.racerId}
-                          style={{
-                            backgroundColor: rowBg,
-                            borderBottom: '1px solid #e0e0e0',
-                            transition: 'background-color 0.2s',
-                          }}
-                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = isQualified ? '#ffeaa7' : '#e9ecef')}
-                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = rowBg)}
-                        >
+                        <tr key={result.racerId} style={{ backgroundColor: rowBg, borderBottom: '1px solid #e0e0e0' }}>
                           <td style={{ padding: '16px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               {index < 3 && isQualified && (
-                                <span style={{ fontSize: '24px' }}>
-                                  {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
-                                </span>
+                                <span style={{ fontSize: '24px' }}>{index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}</span>
                               )}
                               <span style={{ fontWeight: 'bold', fontSize: '18px', color: '#333' }}>{result.rank}</span>
                             </div>
                           </td>
                           <td style={{ padding: '16px' }}>
                             <span
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigate(`/racer/${result.racerId}`);
-                              }}
+                              onClick={() => navigate(`/racer/${result.racerId}`)}
                               style={{ color: '#007bff', cursor: 'pointer', fontWeight: 'bold' }}
-                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
                             >
                               {result.racer.name}
                             </span>
                           </td>
                           <td style={{ padding: '16px' }}>
-                            <span
-                              style={{
-                                padding: '4px 12px',
-                                backgroundColor: '#007bff',
-                                color: 'white',
-                                borderRadius: '12px',
-                                fontSize: '12px',
-                                fontWeight: 'bold',
-                              }}
-                            >
+                            <span style={{ padding: '4px 12px', backgroundColor: '#007bff', color: 'white', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
                               {result.racer.rank}
                             </span>
                           </td>
@@ -378,9 +514,7 @@ export default function SGDetailPage() {
                                 <div style={{ fontWeight: 'bold', color: '#28a745' }}>
                                   ¥{prizeRankingMap.get(result.racerId)?.prizeMoney.toLocaleString()}
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                                  ({prizeRankingMap.get(result.racerId)?.rank}位)
-                                </div>
+                                <div style={{ fontSize: '12px', color: '#6c757d' }}>({prizeRankingMap.get(result.racerId)?.rank}位)</div>
                               </div>
                             ) : (
                               <span style={{ color: '#adb5bd', fontSize: '14px' }}>-</span>
@@ -392,9 +526,7 @@ export default function SGDetailPage() {
                                 <div style={{ fontWeight: 'bold', color: '#6f42c1' }}>
                                   {fanVoteMap.get(result.racerId)?.votes.toLocaleString()}票
                                 </div>
-                                <div style={{ fontSize: '12px', color: '#6c757d' }}>
-                                  ({fanVoteMap.get(result.racerId)?.rank}位)
-                                </div>
+                                <div style={{ fontSize: '12px', color: '#6c757d' }}>({fanVoteMap.get(result.racerId)?.rank}位)</div>
                               </div>
                             ) : (
                               <span style={{ color: '#adb5bd', fontSize: '14px' }}>-</span>
@@ -405,41 +537,11 @@ export default function SGDetailPage() {
                           </td>
                           <td style={{ padding: '16px', textAlign: 'center' }}>
                             {isQualified ? (
-                              <span
-                                style={{
-                                  padding: '6px 12px',
-                                  backgroundColor: '#d4edda',
-                                  color: '#155724',
-                                  borderRadius: '12px',
-                                  fontSize: '12px',
-                                  fontWeight: 'bold',
-                                }}
-                              >
-                                資格あり
-                              </span>
-                            ) : isBorderline ? (
-                              <span
-                                style={{
-                                  padding: '6px 12px',
-                                  backgroundColor: '#fff3cd',
-                                  color: '#856404',
-                                  borderRadius: '12px',
-                                  fontSize: '12px',
-                                  fontWeight: 'bold',
-                                }}
-                              >
-                                ボーダー付近
+                              <span style={{ padding: '6px 12px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '12px', fontSize: '12px', fontWeight: 'bold' }}>
+                                資格見込み
                               </span>
                             ) : (
-                              <span
-                                style={{
-                                  padding: '6px 12px',
-                                  backgroundColor: '#e2e3e5',
-                                  color: '#6c757d',
-                                  borderRadius: '12px',
-                                  fontSize: '12px',
-                                }}
-                              >
+                              <span style={{ padding: '6px 12px', backgroundColor: '#e2e3e5', color: '#6c757d', borderRadius: '12px', fontSize: '12px' }}>
                                 圏外
                               </span>
                             )}

@@ -232,6 +232,23 @@ class BoatraceAPI {
     }
   }
 
+  // SGレースの出場選手一覧を取得（boatrace.jp のレース番組表から）
+  async getSGEntries(
+    jcd: string,
+    hd: string
+  ): Promise<{ entries: Array<{ racerId: string; name: string }>; announced: boolean }> {
+    try {
+      const response = await this.apiClient.get(`/api/sg-entries?jcd=${jcd}&hd=${hd}`);
+      return {
+        entries: response.data.entries || [],
+        announced: !!response.data.announced,
+      };
+    } catch (error) {
+      console.error('出場選手一覧の取得に失敗しました:', error);
+      return { entries: [], announced: false };
+    }
+  }
+
   // ===== ユーティリティ関数 =====
 
   private getVenueCodeByName(name: string): string {
