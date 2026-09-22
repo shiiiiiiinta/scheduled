@@ -77,6 +77,10 @@ export default function SGListPage() {
           }
         }
 
+        // DEBUG: マージ結果のグランプリ日程を確認（一時デバッグ）
+        const gp = merged.find((m) => m.type === 'GRAND_PRIX');
+        console.log('🏁 SG APIレース件数:', apiRaces.length, '/ グランプリ:', gp ? `${gp.startDate}〜${gp.endDate} ${gp.venue}` : 'なし');
+
         setRaces(merged);
         setDataSource(apiRaces.length > 0 ? 'api' : 'static');
       } catch (e) {
