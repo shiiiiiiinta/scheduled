@@ -76,6 +76,7 @@ export default function SGDetailPage() {
         const hd = race.startDate.replace(/-/g, '');
         const jcd = race.venueCode;
         const { entries: rawEntries, announced } = await boatraceAPI.getSGEntries(jcd, hd);
+        console.log(`🎯 SG出場選手取得: announced=${announced} / ${rawEntries.length}名 (jcd=${jcd}, hd=${hd})`);
 
         setEntriesAnnounced(announced);
 
