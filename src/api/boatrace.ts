@@ -238,7 +238,10 @@ class BoatraceAPI {
     hd: string
   ): Promise<{ entries: Array<{ racerId: string; name: string }>; announced: boolean }> {
     try {
-      const response = await this.apiClient.get(`/api/sg-entries?jcd=${jcd}&hd=${hd}`);
+      // raceindexのスクレイピングは時間がかかるためタイムアウトを延長（30秒）
+      const response = await this.apiClient.get(`/api/sg-entries?jcd=${jcd}&hd=${hd}`, {
+        timeout: 30000,
+      });
       return {
         entries: response.data.entries || [],
         announced: !!response.data.announced,
