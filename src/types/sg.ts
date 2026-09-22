@@ -106,7 +106,7 @@ export const SG_SCHEDULE_2026: SGRace[] = [
     startDate: '2026-03-24',
     endDate: '2026-03-29',
     venue: '蒲郡',
-    venueCode: '14',
+    venueCode: '07',
     prizeMoney: 4200,
     qualificationCriteria: '前年のSG・G1・G2優勝者、一般戦優勝回数上位'
   },
@@ -118,7 +118,7 @@ export const SG_SCHEDULE_2026: SGRace[] = [
     startDate: '2026-05-26',
     endDate: '2026-05-31',
     venue: '浜名湖',
-    venueCode: '15',
+    venueCode: '06',
     prizeMoney: 4200,
     qualificationCriteria: 'ファン投票上位選手（A1級）'
   },
@@ -130,7 +130,7 @@ export const SG_SCHEDULE_2026: SGRace[] = [
     startDate: '2026-06-23',
     endDate: '2026-06-28',
     venue: '鳴門',
-    venueCode: '21',
+    venueCode: '14',
     prizeMoney: 3800,
     qualificationCriteria: '過去1年間のSG優出完走・予選得点上位'
   },
@@ -142,7 +142,7 @@ export const SG_SCHEDULE_2026: SGRace[] = [
     startDate: '2026-07-28',
     endDate: '2026-08-02',
     venue: 'びわこ',
-    venueCode: '19',
+    venueCode: '11',
     prizeMoney: 3700,
     qualificationCriteria: 'G2以上の優勝戦着順点上位'
   },
@@ -166,7 +166,7 @@ export const SG_SCHEDULE_2026: SGRace[] = [
     startDate: '2026-10-27',
     endDate: '2026-11-01',
     venue: '尼崎',
-    venueCode: '17',
+    venueCode: '13',
     prizeMoney: 4200,
     qualificationCriteria: '選考期間中の勝率上位'
   },
@@ -178,7 +178,7 @@ export const SG_SCHEDULE_2026: SGRace[] = [
     startDate: '2026-11-24',
     endDate: '2026-11-29',
     venue: '常滑',
-    venueCode: '16',
+    venueCode: '08',
     prizeMoney: 3700,
     qualificationCriteria: '獲得賞金ランキング上位'
   },
@@ -187,8 +187,8 @@ export const SG_SCHEDULE_2026: SGRace[] = [
     type: 'GRAND_PRIX',
     name: 'グランプリ',
     fullName: '第41回グランプリ（賞金王決定戦）',
-    startDate: '2026-12-21',
-    endDate: '2026-12-26',
+    startDate: '2026-12-15',
+    endDate: '2026-12-20',
     venue: '大村',
     venueCode: '24',
     prizeMoney: 11000,
