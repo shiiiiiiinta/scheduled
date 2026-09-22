@@ -42,10 +42,20 @@ export default function SGListPage() {
         const data = await res.json();
         const apiRaces: any[] = data.races || [];
 
+        // 選手スケジュール由来の重複（「第XX回〜」付き）より、
+        // gradesch由来の正式名（「第XX回」なし）を優先してマッチさせる
+        const findByType = (type: SGRaceType) => {
+          const candidates = apiRaces.filter((r) => detectSGType(r.raceName) === type);
+          if (candidates.length === 0) return undefined;
+          // 「第」で始まらない名称を優先
+          const official = candidates.find((r) => !/^第/.test(r.raceName));
+          return official || candidates[0];
+        };
+
         // 静的メタデータ（優勝賞金・出場資格・正式名）をベースに、
         // APIの実データ（開催日・会場）を type で突き合わせて上書き
         const merged: SGRace[] = SG_SCHEDULE_2026.map((base) => {
-          const match = apiRaces.find((r) => detectSGType(r.raceName) === base.type);
+          const match = findByType(base.type);
           if (match) {
             return {
               ...base,
@@ -76,10 +86,6 @@ export default function SGListPage() {
             });
           }
         }
-
-        // DEBUG: マージ結果のグランプリ日程を確認（一時デバッグ）
-        const gp = merged.find((m) => m.type === 'GRAND_PRIX');
-        console.log('🏁 SG APIレース件数:', apiRaces.length, '/ グランプリ:', gp ? `${gp.startDate}〜${gp.endDate} ${gp.venue}` : 'なし');
 
         setRaces(merged);
         setDataSource(apiRaces.length > 0 ? 'api' : 'static');
